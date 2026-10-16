@@ -23,6 +23,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jash.salescashtracker.R
 import com.jash.salescashtracker.data.Repository
 import com.jash.salescashtracker.data.Totals
+import com.jash.salescashtracker.data.dueAfterCash
+import androidx.compose.runtime.remember
 import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -39,6 +41,9 @@ fun HomeScreen(state: AppState) {
     val pb = bookings.filter { state.inPeriod(it.date) }
     val pc = cash.filter { state.inPeriod(it.date) }
     val t = Totals.of(pb, pc)
+    // Balance still due on this period's sales after agents' cash payments are applied
+    val dueMap = remember(bookings, cash) { dueAfterCash(bookings, cash) }
+    val balanceDue = pb.sumOf { dueMap[it.id] ?: (it.balance ?: 0.0) }
     val hour = LocalTime.now().hour
     val greet = when { hour < 12 -> "Good morning"; hour < 17 -> "Good afternoon"; else -> "Good evening" }
     val firstName = nice(settings.user.split(" ").firstOrNull() ?: "")
@@ -110,7 +115,7 @@ fun HomeScreen(state: AppState) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MetricTile(R.drawable.lc_hand_coins, "Balance due · $code", amt(t.balance), Modifier.weight(1f)) { state.tab = Tab.Sales }
+                    MetricTile(R.drawable.lc_hand_coins, "Balance due · $code", amt(balanceDue), Modifier.weight(1f)) { state.tab = Tab.Sales }
                     MetricTile(R.drawable.lc_wallet, "Cash paid · $code", amt(t.cash), Modifier.weight(1f)) { state.tab = Tab.Cash }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

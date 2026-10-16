@@ -40,6 +40,8 @@ import com.jash.salescashtracker.data.Booking
 import com.jash.salescashtracker.data.CashEntry
 import com.jash.salescashtracker.data.Repository
 import com.jash.salescashtracker.data.Totals
+import com.jash.salescashtracker.data.dueAfterCash
+import com.jash.salescashtracker.data.statusWith
 import com.jash.salescashtracker.ui.theme.Inter
 import java.time.LocalDate
 import java.time.YearMonth
@@ -118,6 +120,8 @@ private fun DayHeader(day: String, total: String) {
 @Composable
 fun SalesScreen(state: AppState) {
     val bookings by Repository.bookings.collectAsStateWithLifecycle()
+    val cash by Repository.cash.collectAsStateWithLifecycle()
+    val due = remember(bookings, cash) { dueAfterCash(bookings, cash) }
     val code = LocalCurrency.current
     var search by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("") }
@@ -126,7 +130,10 @@ fun SalesScreen(state: AppState) {
         .filter { state.inPeriod(it.date) }
         .filter { state.agentFilter.isBlank() || it.agent == state.agentFilter }
         .filter { q.isBlank() || listOf(it.customer, it.agent, it.pnr, it.ref, it.detail, it.contact, it.sector, it.category).any { f -> f.lowercase().contains(q) } }
-        .filter { when (status) { "" -> true; "DUE" -> (it.balance ?: 0.0) > 0.5; else -> it.paymentStatus == status } }
+        .filter { b ->
+            val d = due[b.id] ?: (b.balance ?: 0.0)
+            when (status) { "" -> true; "DUE" -> d > 0.5; else -> b.statusWith(d) == status }
+        }
         .sortedWith(compareByDescending<Booking> { it.date }.thenByDescending { it.createdAt })
     val t = Totals.of(rows, emptyList())
     val groups = rows.groupBy { it.date }
@@ -157,14 +164,14 @@ fun SalesScreen(state: AppState) {
         }
         groups.forEach { (day, list) ->
             item(key = "h$day") { DayHeader(day, cur(list.sumOf { it.sellingPrice ?: 0.0 }, code)) }
-            items(list, key = { it.id }) { b -> SaleCard(b, code) { state.push(Route.EditSale(b)) } }
+            items(list, key = { it.id }) { b -> SaleCard(b, due[b.id] ?: (b.balance ?: 0.0), code) { state.push(Route.EditSale(b)) } }
         }
         item { TabBarSpacer() }
     }
 }
 
 @Composable
-private fun SaleCard(b: Booking, code: String, onClick: () -> Unit) {
+private fun SaleCard(b: Booking, due: Double, code: String, onClick: () -> Unit) {
     GlassCard(padding = PaddingValues(14.dp), spacing = 10.dp, onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             IconTile(productIcon(b.category))
@@ -180,7 +187,7 @@ private fun SaleCard(b: Booking, code: String, onClick: () -> Unit) {
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             T(nice(b.agent).ifBlank { "No agent" }, 11.sp, Glass.Muted, modifier = Modifier.weight(1f))
-            PaymentPill(b.paymentStatus, b.balance ?: 0.0)
+            PaymentPill(b.statusWith(due), due)
         }
     }
 }

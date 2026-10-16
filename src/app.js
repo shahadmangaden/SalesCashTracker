@@ -302,6 +302,31 @@ function agentOptions(selected) {
 }
 
 // ---------- Bookings ----------
+
+// Cash paid by an agent isn't tied to one sale: apply each agent's cash to their sales, oldest first,
+// so a sale shows as paid once the agent has paid for it. Returns Map(saleId -> amount still due).
+function dueAfterCash() {
+  const pool = new Map();
+  data.cash.forEach(c => { if (c.agent) pool.set(up(c.agent), (pool.get(up(c.agent)) || 0) + n0(c.amount)); });
+  const out = new Map();
+  [...data.bookings].sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
+    .forEach(b => {
+      let due = Math.max(0, n0(calc(b).balance));
+      const k = up(b.agent), avail = pool.get(k) || 0;
+      if (b.agent && due > 0 && avail > 0) { const use = Math.min(due, avail); due -= use; pool.set(k, avail - use); }
+      out.set(b.id, due);
+    });
+  return out;
+}
+function statusWith(b, due) {
+  const st = up(b.paymentStatus), sell = n0(b.sellingPrice);
+  if (st === 'REFUNDED' || sell <= 0) return st;
+  if (due <= 0.5) return 'PAID';
+  if (due < sell - 0.5) return 'PARTIAL';
+  return (st === 'PAID' || st === 'PARTIAL') ? 'PENDING' : (st || 'PENDING');
+}
+let dueMap = new Map();
+const dueOf = b => dueMap.has(b.id) ? dueMap.get(b.id) : n0(calc(b).balance);
 const BOOKING_COLS = [
   { key: 'date', label: 'T. Date', fmt: b => fdate(b.date) },
   { key: 'customer', label: 'Customer Name' },
@@ -315,7 +340,7 @@ const BOOKING_COLS = [
   { key: 'sellingPrice', label: 'Selling', num: true, fmt: b => money(b.sellingPrice) },
   { key: 'profit', label: 'Profit', num: true, calc: true, fmt: (b, c) => `<span class="${c.profit < 0 ? 'neg' : 'pos'}">${money(c.profit)}</span>` },
   { key: 'margin', label: '%', num: true, calc: true, fmt: (b, c) => pct(c.margin) },
-  { key: 'paymentStatus', label: 'Payment', fmt: b => b.paymentStatus ? `<span class="pill ${esc(b.paymentStatus)}">${esc(b.paymentStatus)}</span>` : '' },
+  { key: 'paymentStatus', label: 'Payment', fmt: b => { const st = statusWith(b, dueOf(b)); return st ? `<span class="pill ${esc(st)}">${esc(st)}</span>` : ''; } },
   { key: 'paymentMode', label: 'Mode' },
   { key: 'amountPaid', label: 'Paid', num: true, fmt: b => money(b.amountPaid) },
   { key: 'balance', label: 'Balance', num: true, calc: true, fmt: (b, c) => `<span class="${c.balance > 0 ? 'due' : ''}">${money(c.balance, true)}</span>` },
@@ -339,11 +364,12 @@ function sortRows(rows, s, getter) {
 }
 
 function renderBookings(v) {
+  dueMap = dueAfterCash();
   const f = ui.bookingFilter;
   let rows = periodBookings().filter(b =>
     matchesSearch(b, ['customer', 'agent', 'pnr', 'ref', 'detail', 'contact', 'sector', 'category']) &&
     (!f.agent || b.agent === f.agent) && (!f.category || b.category === f.category) &&
-    (!f.status || (f.status === 'DUE' ? n0(calc(b).balance) > 0 : b.paymentStatus === f.status)));
+    (!f.status || (f.status === 'DUE' ? dueOf(b) > 0.5 : statusWith(b, dueOf(b)) === f.status)));
   const s = ui.sort.bookings;
   rows = sortRows(rows, s, (b, k) => { if (['profit', 'margin', 'balance', 'expire'].includes(k)) return calc(b)[k]; return b[k]; });
   const t = totals(rows, []);

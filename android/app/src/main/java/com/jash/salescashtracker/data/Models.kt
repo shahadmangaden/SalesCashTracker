@@ -237,3 +237,40 @@ fun parseDate(s: String?): LocalDate? =
 
 private fun Map<String, Any?>.str(key: String): String = (this[key] as? String) ?: ""
 private fun Map<String, Any?>.num(key: String): Double? = (this[key] as? Number)?.toDouble()
+
+/**
+ * Cash paid by an agent is recorded separately, not against one sale.
+ * Apply each agent's total cash to that agent's sales, oldest first, so a sale
+ * shows as paid once the agent has paid for it. Returns sale id -> amount still due.
+ */
+fun dueAfterCash(bookings: List<Booking>, cash: List<CashEntry>): Map<String, Double> {
+    fun key(s: String) = s.trim().uppercase()
+    val pool = cash.filter { it.agent.isNotBlank() }.groupBy { key(it.agent) }
+        .mapValues { e -> e.value.sumOf { it.amount } }.toMutableMap()
+    val out = HashMap<String, Double>()
+    bookings.sortedWith(compareBy<Booking> { it.date }.thenBy { it.createdAt }).forEach { b ->
+        var due = (b.balance ?: 0.0).coerceAtLeast(0.0)
+        val k = key(b.agent)
+        val avail = pool[k] ?: 0.0
+        if (due > 0.0 && avail > 0.0 && b.agent.isNotBlank()) {
+            val use = minOf(due, avail)
+            due -= use
+            pool[k] = avail - use
+        }
+        out[b.id] = due
+    }
+    return out
+}
+
+/** Payment status taking the agent's cash payments into account. */
+fun Booking.statusWith(due: Double): String {
+    val st = paymentStatus.uppercase()
+    val sell = sellingPrice ?: 0.0
+    return when {
+        st == "REFUNDED" -> st
+        sell <= 0.0 -> st
+        due <= 0.5 -> "PAID"
+        due < sell - 0.5 -> "PARTIAL"
+        else -> if (st == "PAID" || st == "PARTIAL") "PENDING" else st.ifBlank { "PENDING" }
+    }
+}

@@ -287,13 +287,13 @@ fun StatusPill(text: String, fg: Color, bg: Color, size: TextUnit = 10.sp) {
 
 /** Payment pill for a sale: Paid / Partial / Pending / Balance due. */
 @Composable
-fun PaymentPill(status: String, balance: Double) {
+fun PaymentPill(status: String, due: Double) {
     when (status.uppercase()) {
         "PAID" -> StatusPill("Paid", Glass.Green, Glass.GreenBg)
         "PARTIAL" -> StatusPill("Partial", Glass.Blue, Glass.BlueBg)
         "PENDING" -> StatusPill("Pending", Glass.Muted, Glass.NeutralBg)
         "REFUNDED" -> StatusPill("Refunded", Glass.Red, Glass.RedBg)
-        else -> if (balance > 0.5) StatusPill("Balance due", Glass.Amber, Glass.AmberBg)
+        else -> if (due > 0.5) StatusPill("Balance due", Glass.Amber, Glass.AmberBg)
     }
 }
 
