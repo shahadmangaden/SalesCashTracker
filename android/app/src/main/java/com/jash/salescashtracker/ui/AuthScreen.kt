@@ -97,11 +97,7 @@ fun AuthScreen() {
         }
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF1D3A66), AppColors.Navy, Color(0xFF0C1D38)))),
-    ) {
+    GlassBackground {
         Column(
             Modifier
                 .fillMaxSize()
@@ -115,14 +111,14 @@ fun AuthScreen() {
             Image(
                 painter = painterResource(R.mipmap.ic_launcher_foreground),
                 contentDescription = null,
-                modifier = Modifier.size(88.dp).clip(RoundedCornerShape(22.dp)).background(Color(0xFF1A4E9E)),
+                modifier = Modifier.size(92.dp).glass(RoundedCornerShape(24.dp), strong = true, elevation = 14.dp).background(Color(0xFF1A4E9E)),
             )
             Spacer(Modifier.height(12.dp))
-            Text("Sales Cash Tracker", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text("Sales & cash paid, on every device", color = Color(0xFFB8C6DD), fontSize = 14.sp)
+            Text("Sales Cash Tracker", color = Glass.Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            Text("Sales & cash paid, on every device", color = Glass.Muted, fontSize = 15.sp)
             Spacer(Modifier.height(24.dp))
 
-            Surface(shape = RoundedCornerShape(20.dp), color = Color.White, modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(28.dp), strong = true, elevation = 16.dp)) {
                 Column(Modifier.padding(22.dp)) {
                     Text(
                         when (mode) { AuthMode.SignIn -> "Sign in"; AuthMode.SignUp -> "Create account"; AuthMode.Reset -> "Reset password" },
@@ -172,9 +168,9 @@ fun AuthScreen() {
                     Button(
                         onClick = { submit() },
                         enabled = !busy,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Blue),
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Glass.Tint),
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
                     ) {
                         if (busy) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
                         else Text(when (mode) { AuthMode.SignIn -> "Sign in"; AuthMode.SignUp -> "Create account"; AuthMode.Reset -> "Send reset link" })
