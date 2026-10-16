@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>Sales &amp; Cash Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">S</div>
+      <div>
+        <div class="brand-name" id="brandCompany">BAKHTAR TRAVELS</div>
+        <div class="brand-sub" id="brandUser">Sales &amp; Cash Tracker</div>
+      </div>
+    </div>
+    <nav id="nav">
+      <button data-view="dashboard" class="active"><span class="ic">▦</span>Dashboard</button>
+      <button data-view="bookings"><span class="ic">✈</span>Sales / Bookings</button>
+      <button data-view="cash"><span class="ic">◈</span>Cash Paid Log</button>
+      <button data-view="ledger"><span class="ic">☰</span>Agent Ledger</button>
+      <button data-view="expiry"><span class="ic">⏱</span>Visa Expiry <span class="badge" id="expiryBadge" hidden></span></button>
+      <button data-view="settings"><span class="ic">⚙</span>Lists &amp; Data</button>
+    </nav>
+    <div class="side-actions">
+      <button class="btn primary block" id="sideAddBooking">+ New Sale</button>
+      <button class="btn block ghost-light" id="sideAddCash">+ Cash Paid</button>
+    </div>
+    <div class="side-foot" id="sideFoot"></div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <h1 id="viewTitle">Dashboard</h1>
+      <div class="top-controls">
+        <label class="month-pick">Period
+          <select id="monthFilter"></select>
+        </label>
+        <input type="search" id="search" placeholder="Search customer, agent, PNR…" hidden>
+      </div>
+    </header>
+    <section id="view"></section>
+  </main>
+
+  <div class="modal-back" id="modalBack" hidden>
+    <div class="modal" id="modal"></div>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

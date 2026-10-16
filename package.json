@@ -1,0 +1,58 @@
+{
+  "name": "salescashtracker",
+  "productName": "Sales Cash Tracker",
+  "version": "1.0.0",
+  "description": "Sales & Cash Paid Tracker desktop app for Bakhtar Travels",
+  "main": "main.js",
+  "author": "Sahad M <sahadmangaden@gmail.com>",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable --publish never"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.jash.salescashtracker",
+    "productName": "Sales Cash Tracker",
+    "copyright": "Sahad M",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**",
+      "src/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Sales Cash Tracker",
+      "artifactName": "SalesCashTracker-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "SalesCashTracker-Portable-${version}.${ext}"
+    }
+  }
+}
