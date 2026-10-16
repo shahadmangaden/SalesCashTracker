@@ -69,7 +69,6 @@ sealed class Route {
     data class EditSale(val booking: Booking?, val isCopy: Boolean = false, val nonce: Long = System.nanoTime()) : Route()
     data class EditCash(val entry: CashEntry?, val nonce: Long = System.nanoTime()) : Route()
     data object QuickAdd : Route()
-    data object ListsEditor : Route()
 }
 
 /** UI-wide state shared by the tabs. */
@@ -151,7 +150,6 @@ fun MainShell() {
                         is Route.EditSale -> SaleSheet(r.booking, r.isCopy, state)
                         is Route.EditCash -> CashSheet(r.entry, state)
                         Route.QuickAdd -> QuickAddSheet(state)
-                        Route.ListsEditor -> ListsEditorSheet(state)
                     }
                 }
             }

@@ -353,33 +353,20 @@ fun SettingsScreen(state: AppState) {
             }
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionHeading("Your business")
-                GlassCard(padding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
-                    SettingRow(R.drawable.lc_building_2, "Business details",
-                        listOf(nice(settings.company), nice(settings.user)).filter { it.isNotBlank() }.joinToString(" · "), true) { dialog = "business" }
-                    SettingRow(R.drawable.lc_list_filter, "Manage lists",
-                        "${lists.agents.size} agents · ${lists.categories.size} products · ${lists.paymentModes.size} payment modes", true) { state.push(Route.ListsEditor) }
-                    SettingRow(R.drawable.lc_banknote, "Currency & preferences", settings.currency.ifBlank { "AED" }, false) { dialog = "currency" }
-                }
+            GlassCard(padding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
+                SettingRow(R.drawable.lc_building_2, "Business details",
+                    listOf(nice(settings.company), nice(settings.user), settings.currency.ifBlank { "AED" }).filter { it.isNotBlank() }.joinToString(" · "), true) { dialog = "business" }
+                SettingRow(R.drawable.lc_file_down, "Export to Excel", "Sales & cash paid", true) { exportCsv(ctx, bookings, cash, lists) }
+                SettingRow(R.drawable.lc_cloud_check, "Backup & restore", "${bookings.size} sales · ${cash.size} payments", false) { dialog = "backup" }
             }
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionHeading("Data & peace of mind")
-                GlassCard(padding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
-                    SettingRow(R.drawable.lc_file_down, "Export data", "Sales & cash paid · CSV for Excel", true) { exportCsv(ctx, bookings, cash, lists) }
-                    SettingRow(R.drawable.lc_cloud_check, "Backup & restore", "${bookings.size} sales · ${cash.size} payments synced to your account", false) { dialog = "backup" }
-                }
-            }
-        }
-        item {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (syncLine.isNotEmpty()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Lc(if (sync == SyncState.Synced) R.drawable.lc_circle_check else if (sync == SyncState.Offline) R.drawable.lc_cloud_off else R.drawable.lc_refresh_cw, syncColor, 14.dp)
                     T(syncLine, 11.sp, syncColor)
                 }
-                T("Sales Cash Tracker · Version ${BuildConfig.VERSION_NAME}", 12.sp, Glass.Muted, align = TextAlign.Center)
+                T("Version ${BuildConfig.VERSION_NAME}", 12.sp, Glass.Muted, align = TextAlign.Center)
             }
         }
         item { TabBarSpacer() }
@@ -413,6 +400,7 @@ fun SettingsScreen(state: AppState) {
         "business" -> {
             var company by remember { mutableStateOf(settings.company) }
             var person by remember { mutableStateOf(settings.user) }
+            var currency by remember { mutableStateOf(settings.currency) }
             AlertDialog(
                 onDismissRequest = { dialog = null },
                 title = { Text("Business details") },
@@ -422,25 +410,12 @@ fun SettingsScreen(state: AppState) {
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters))
                         OutlinedTextField(person, { person = it }, label = { Text("Your name") }, singleLine = true,
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters))
+                        OutlinedTextField(currency, { currency = it.uppercase().take(4) }, label = { Text("Currency") }, singleLine = true,
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters))
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { Repository.saveSettings(settings.copy(company = company.trim(), user = person.trim())); dialog = null }) { Text("Save") }
-                },
-                dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
-            )
-        }
-        "currency" -> {
-            var currency by remember { mutableStateOf(settings.currency) }
-            AlertDialog(
-                onDismissRequest = { dialog = null },
-                title = { Text("Currency") },
-                text = {
-                    OutlinedTextField(currency, { currency = it.uppercase().take(4) }, label = { Text("Currency code (e.g. AED)") }, singleLine = true,
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters))
-                },
-                confirmButton = {
-                    TextButton(onClick = { Repository.saveSettings(settings.copy(currency = currency.trim().ifBlank { "AED" })); dialog = null }) { Text("Save") }
+                    TextButton(onClick = { Repository.saveSettings(settings.copy(company = company.trim(), user = person.trim(), currency = currency.trim().ifBlank { "AED" })); dialog = null }) { Text("Save") }
                 },
                 dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
             )
@@ -478,74 +453,5 @@ fun SettingsScreen(state: AppState) {
             },
             dismissButton = { TextButton(onClick = { restoreInfo = null }) { Text("Cancel") } },
         )
-    }
-}
-
-// ---------- Lists editor (sheet) ----------
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun ListsEditorSheet(state: AppState) {
-    val lists by Repository.lists.collectAsStateWithLifecycle()
-    var section by remember { mutableStateOf("agents") }
-    val sections: List<Triple<String, String, Pair<List<String>, (List<String>) -> Lists>>> = listOf(
-        Triple("agents", "Agents", lists.agents to { v: List<String> -> lists.copy(agents = v) }),
-        Triple("categories", "Products", lists.categories to { v: List<String> -> lists.copy(categories = v) }),
-        Triple("paymentModes", "Payment modes", lists.paymentModes to { v: List<String> -> lists.copy(paymentModes = v) }),
-        Triple("customerTypes", "Customer types", lists.customerTypes to { v: List<String> -> lists.copy(customerTypes = v) }),
-        Triple("bookingStatuses", "Booking statuses", lists.bookingStatuses to { v: List<String> -> lists.copy(bookingStatuses = v) }),
-        Triple("countries", "Sectors", lists.countries to { v: List<String> -> lists.copy(countries = v) }),
-        Triple("docTypes", "Visa types", emptyList<String>() to { _: List<String> -> lists }),
-    )
-    var adding by remember(section) { mutableStateOf("") }
-
-    fun add() {
-        val v = adding.trim().uppercase()
-        if (v.isNotEmpty()) {
-            if (section == "docTypes") { if (lists.docTypes.none { it.name == v }) Repository.saveLists(lists.copy(docTypes = lists.docTypes + DocType(v, null))) }
-            else { val (items, update) = sections.first { it.first == section }.third; if (v !in items) Repository.saveLists(update(items + v)) }
-        }
-        adding = ""
-    }
-
-    SheetFrame("Manage lists", onClose = { state.pop() }, spacing = 14.dp) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            sections.forEach { (key, label, _) -> Choice(label, section == key, { section = key }) }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GlassInput(null, adding, { adding = it }, Modifier.weight(1f), placeholder = "Add new…", caps = KeyboardCapitalization.Characters)
-            Box(
-                Modifier.size(46.dp).clip(CircleShape).background(Glass.Blue).clickable { add() },
-                contentAlignment = Alignment.Center,
-            ) { Lc(R.drawable.lc_plus, Color.White, 22.dp, description = "Add") }
-        }
-        GlassCard(padding = PaddingValues(horizontal = 14.dp, vertical = 4.dp)) {
-            if (section == "docTypes") {
-                lists.docTypes.forEachIndexed { i, d ->
-                    if (i > 0) Box(Modifier.fillMaxWidth().height(0.6.dp).background(Glass.Divider))
-                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        T(sentence(d.name), 13.sp, Glass.Ink, FontWeight.Medium, Modifier.weight(1f))
-                        var days by remember(d.name, d.days) { mutableStateOf(d.days?.toString() ?: "") }
-                        GlassInput(null, days, { v ->
-                            days = v.filter { it.isDigit() }
-                            Repository.saveLists(lists.copy(docTypes = lists.docTypes.map { x -> if (x.name == d.name) x.copy(days = days.toIntOrNull()) else x }))
-                        }, Modifier.width(84.dp), placeholder = "days", keyboard = KeyboardType.Number)
-                        Lc(R.drawable.lc_trash_2, Glass.Red, 18.dp,
-                            Modifier.clip(CircleShape).clickable { Repository.saveLists(lists.copy(docTypes = lists.docTypes.filterIndexed { j, _ -> j != i })) }, "Remove")
-                    }
-                }
-            } else {
-                val (items, update) = sections.first { it.first == section }.third
-                if (items.isEmpty()) T("Nothing here yet — add one above.", 13.sp, Glass.Muted, modifier = Modifier.padding(vertical = 12.dp))
-                items.forEachIndexed { i, v ->
-                    if (i > 0) Box(Modifier.fillMaxWidth().height(0.6.dp).background(Glass.Divider))
-                    Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-                        T(if (section == "agents") nice(v) else sentence(v), 14.sp, Glass.Ink, FontWeight.Medium, Modifier.weight(1f))
-                        Lc(R.drawable.lc_trash_2, Glass.Red, 18.dp,
-                            Modifier.clip(CircleShape).clickable { Repository.saveLists(update(items.filterIndexed { j, _ -> j != i })) }, "Remove")
-                    }
-                }
-            }
-        }
     }
 }

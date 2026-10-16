@@ -157,7 +157,7 @@ function renderMonthFilter() {
 }
 
 // ---------- Navigation ----------
-const TITLES = { dashboard: 'Dashboard', bookings: 'Sales / Bookings', cash: 'Cash Paid Log', ledger: 'Agent Ledger', expiry: 'Visa Expiry Tracker', settings: 'Lists & Data' };
+const TITLES = { dashboard: 'Dashboard', bookings: 'Sales / Bookings', cash: 'Cash Paid Log', ledger: 'Agent Ledger', expiry: 'Visa Expiry Tracker', settings: 'Settings' };
 function go(view) {
   ui.view = view;
   $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
@@ -184,7 +184,7 @@ function welcomeHTML() {
     <p>You're starting fresh. Record each sale or booking as it happens, and log cash paid by agents. Totals, profit, balances, the agent ledger and visa expiry alerts all fill in automatically.</p>
     <div><button class="btn primary" id="wNew">+ Add first sale</button>
     <button class="btn" id="wCash">+ Record cash paid</button></div>
-    <p class="muted" style="font-size:12px;margin-top:14px">Your records are saved in this browser on this device. Save a backup file now and then from <b>Lists &amp; Data</b>.<br>
+    <p class="muted" style="font-size:12px;margin-top:14px">Your records are saved in this browser on this device. Save a backup file now and then from <b>Settings</b>.<br>
     Have an existing Excel tracker? <a href="#" id="wImport">Import it</a> · <a href="#" id="wRestore">Restore a backup</a></p>
   </div>`;
   }
@@ -617,7 +617,7 @@ function renderExpiry(v) {
   rows.sort((a, b) => f === 'expired' ? b.c.left - a.c.left : a.c.left - b.c.left);
   v.innerHTML = `
     <div class="toolbar"><div class="chips">${[['upcoming', 'Active / upcoming'], ['expired', 'Expired'], ['all', 'All']].map(([k, l]) => `<span class="chip ${f === k ? 'on' : ''}" data-f="${k}">${l}</span>`).join('')}</div>
-    <div class="spacer"></div><span class="muted">Expiry = Entry Date + visa duration (set durations under Lists &amp; Data)</span></div>
+    <div class="spacer"></div><span class="muted">Expiry = Entry Date + visa duration</span></div>
     <div class="table-wrap"><table>
       <thead><tr><th>Customer</th><th>Agent</th><th>Product</th><th>Visa / Doc Type</th><th>Entry Date</th><th>Expire Date</th><th class="num">Days Left</th><th>Contact</th><th>Status</th></tr></thead>
       <tbody>${rows.map(({ b, c }) => `<tr data-id="${b.id}"><td class="clickable">${esc(b.customer)}</td><td>${esc(b.agent)}</td><td>${esc(b.category)}</td><td>${esc(b.docType)}</td><td>${fdate(b.entryDate)}</td><td>${fdate(c.expire)}</td>
@@ -628,42 +628,25 @@ function renderExpiry(v) {
 }
 
 // ---------- Settings / lists / data ----------
-const LIST_DEFS = [
-  ['agents', 'Agents / Sub-Agents'], ['categories', 'Product Categories'], ['customerTypes', 'Customer Types'],
-  ['paymentModes', 'Payment Modes'], ['paymentStatuses', 'Payment Statuses'], ['bookingStatuses', 'Booking Statuses'], ['countries', 'Sectors / Destinations'],
-];
 async function renderSettings(v) {
   const info = await bridge.info();
   v.innerHTML = `
     <div class="card" style="margin-bottom:14px" id="syncCard"></div>
-    <div class="card" style="margin-bottom:14px"><h2>Data</h2>
-      <p class="muted" style="margin-top:0">${IS_WEB
-        ? 'Everything is saved automatically in this browser on this device, with a snapshot kept each day (last 30 days). Clearing browser data deletes it, so save a backup file regularly. To move to another device, save a backup here and restore it there.'
-        : 'Everything is saved automatically on this PC. A dated backup copy is kept every day (last 60 days).'}</p>
-      <div class="data-actions">
-        <button class="btn primary" id="sImport">Import Excel tracker</button>
-        <button class="btn green" id="sExport">Export to Excel</button>
-        <button class="btn" id="sBackup">Save backup file…</button>
-        <button class="btn" id="sRestore">Restore from backup…</button>
-        ${IS_WEB ? '<button class="btn" id="sSnap">Restore daily snapshot…</button>' : '<button class="btn" id="sFolder">Open data folder</button>'}
-        <button class="btn danger" id="sWipe" style="margin-left:auto">Delete all records…</button>
-      </div>
-      <p class="muted" style="font-size:12px;margin-bottom:0">Data file: <span class="path">${esc(info.dataFile)}</span> · App version ${esc(info.version)} · ${data.bookings.length} bookings, ${data.cash.length} cash entries</p>
-    </div>
     <div class="card" style="margin-bottom:14px"><h2>Business</h2>
       <div class="form-grid" style="grid-template-columns:repeat(3,1fr)">
         <label class="field"><span>Company</span><input type="text" id="setCompany" value="${esc(data.settings.company)}"></label>
-        <label class="field"><span>Sales person</span><input type="text" id="setUser" value="${esc(data.settings.user)}"></label>
+        <label class="field"><span>Your name</span><input type="text" id="setUser" value="${esc(data.settings.user)}"></label>
         <label class="field"><span>Currency</span><input type="text" id="setCur" value="${esc(data.settings.currency)}"></label>
       </div>
     </div>
-    <div class="lists-grid">
-      ${LIST_DEFS.map(([k, label]) => `<div class="card list-edit" data-list="${k}"><h2>${label} <span class="hint">${data.lists[k].length}</span></h2>
-        <ul>${data.lists[k].map((item, i) => `<li><span>${esc(item)}</span><button data-i="${i}" title="Remove">×</button></li>`).join('')}</ul>
-        <div class="add"><input type="text" placeholder="Add new…"><button class="btn small">Add</button></div></div>`).join('')}
-      <div class="card list-edit" data-list="docTypes"><h2>Visa / Doc Types <span class="hint">days → expiry</span></h2>
-        <ul>${data.lists.docTypes.map((d, i) => `<li><span>${esc(d.name)}</span><span style="display:flex;gap:6px;align-items:center"><input type="number" min="0" style="width:70px" data-days="${i}" value="${d.days ?? ''}" placeholder="days"><button data-i="${i}" title="Remove">×</button></span></li>`).join('')}</ul>
-        <div class="add"><input type="text" placeholder="Add new type…"><button class="btn small">Add</button></div></div>
+    <div class="card"><h2>Data</h2>
+      <div class="data-actions">
+        <button class="btn green" id="sExport">Export to Excel</button>
+        <button class="btn" id="sBackup">Save backup file…</button>
+        <button class="btn" id="sRestore">Restore from backup…</button>
+        <button class="btn" id="sImport">Import Excel tracker</button>
+      </div>
+      <p class="muted" style="font-size:12px;margin-bottom:0">Version ${esc(info.version)} · ${data.bookings.length} sales · ${data.cash.length} cash entries</p>
     </div>`;
 
   renderSyncCard();
@@ -671,32 +654,8 @@ async function renderSettings(v) {
   $('#sExport').onclick = doExport;
   $('#sBackup').onclick = async () => { const p = await bridge.saveBackup(data); if (p) toast('Backup saved'); };
   $('#sRestore').onclick = doRestore;
-  if ($('#sFolder')) $('#sFolder').onclick = () => bridge.openDataFolder();
-  if ($('#sSnap')) $('#sSnap').onclick = doRestoreSnapshot;
-  $('#sWipe').onclick = async () => {
-    if (await confirmBox('Delete ALL bookings and cash entries?', 'Lists and settings are kept. Tip: save a backup first. Today\'s automatic backup also stays in the data folder.', 'Delete everything')) {
-      data.bookings = []; data.cash = []; persist(); render(); toast('All records deleted');
-    }
-  };
   const bindSet = (id, key) => { $(id).onchange = e => { data.settings[key] = e.target.value.trim(); persist(); render(); }; };
   bindSet('#setCompany', 'company'); bindSet('#setUser', 'user'); bindSet('#setCur', 'currency');
-
-  $$('.list-edit', v).forEach(card => {
-    const key = card.dataset.list;
-    const input = $('.add input', card);
-    const add = () => {
-      const val = up(input.value);
-      if (!val) return;
-      const list = data.lists[key];
-      if (key === 'docTypes') { if (!list.some(d => d.name === val)) list.push({ name: val, days: null }); }
-      else if (!list.includes(val)) list.push(val);
-      persist(); render();
-    };
-    $('.add button', card).onclick = add;
-    input.onkeydown = e => { if (e.key === 'Enter') add(); };
-    $$('li button', card).forEach(btn => btn.onclick = () => { data.lists[key].splice(+btn.dataset.i, 1); persist(); render(); });
-    $$('[data-days]', card).forEach(inp => inp.onchange = () => { data.lists.docTypes[+inp.dataset.days].days = numOrNull(inp.value); persist(); });
-  });
 }
 
 function signature(b) { return [b.date, up(b.customer), n0(b.sellingPrice), up(b.agent), up(b.detail)].join('|'); }
