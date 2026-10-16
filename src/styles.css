@@ -240,3 +240,31 @@ tr.sel td { background: var(--accent-soft); }
 .sync-state.syncing { background: var(--accent-soft); color: var(--accent); }
 .sync-state.error { background: var(--red-soft); color: var(--red); }
 @media (max-width: 820px) { .top-controls .sync-state { order: -1; } }
+
+/* ---------- Sign-in page ---------- */
+.auth-screen { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; padding: 16px; overflow: auto;
+  background: radial-gradient(1200px 600px at 20% 0%, #1d3a66 0%, var(--navy) 55%, #0c1d38 100%); }
+.auth-card { width: min(420px, 100%); background: #fff; border-radius: 16px; padding: 28px 28px 20px; box-shadow: 0 24px 70px rgba(0,0,0,.35); }
+.auth-brand { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; }
+.auth-company { font-weight: 700; letter-spacing: .3px; }
+.auth-card h2 { margin: 0 0 6px; font-size: 21px; }
+.auth-card p { margin: 0 0 16px; line-height: 1.5; font-size: 13px; }
+.auth-card form { display: flex; flex-direction: column; gap: 12px; }
+.auth-card input { padding: 10px 12px; font-size: 15px; }
+.auth-go { padding: 11px; font-size: 15px; margin-top: 2px; }
+.auth-msg { color: var(--red); font-size: 12.5px; min-height: 0; }
+.auth-msg:empty { display: none; }
+.auth-msg.ok { color: var(--green); }
+.auth-links { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; }
+.auth-links a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.auth-links a:hover { text-decoration: underline; }
+.auth-skip { all: unset; cursor: pointer; display: block; margin: 18px auto 0; font-size: 12.5px; color: var(--muted); }
+.auth-skip:hover { color: var(--text); text-decoration: underline; }
+
+/* Account box in the sidebar */
+.account-box { margin-top: auto; padding: 10px 6px 8px; border-top: 1px solid rgba(255,255,255,.08); display: flex; align-items: center; gap: 8px; }
+.account-box + .side-foot { margin-top: 6px; }
+.acc-email { flex: 1; min-width: 0; font-size: 12px; color: #dbe4f3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acc-out { all: unset; cursor: pointer; font-size: 12px; color: #9fb0cc; }
+.acc-out:hover { color: #fff; text-decoration: underline; }
+@media (max-width: 820px) { .account-box { display: none; } }

@@ -763,6 +763,7 @@ async function doRestoreSnapshot() {
 // ---------- Online sync ----------
 const SYNC_TEXT = {
   off: 'Data saves automatically',
+  checking: '…',
   'signed-out': 'Not syncing · saved on this device',
   syncing: '⟳ Syncing…',
   synced: '☁ Synced',
@@ -782,16 +783,87 @@ function setupSync() {
     if (el) {
       el.hidden = false;
       el.className = 'sync-state ' + info.status;
-      el.onclick = () => go('settings');
+      el.onclick = () => (info.status === 'signed-out' ? showAuth() : go('settings'));
       let t = SYNC_TEXT[info.status] || '';
       if (info.status === 'synced' && !navigator.onLine) t = '☁ Offline · will sync';
       el.textContent = t;
       el.title = info.error || info.email || '';
     }
     if (ui.view === 'settings' && $('#syncCard')) renderSyncCard();
+    renderAccountBox();
+    if (info.status === 'signed-out' && !authSkipped) showAuth();
+    else if (info.status !== 'signed-out' && info.status !== 'checking') hideAuth();
   });
   window.addEventListener('online', () => s.flush());
 }
+
+// ---------- Sign-in page ----------
+let authSkipped = false;     // "Continue without signing in" for this session only
+let authMode = 'in';         // 'in' | 'up' | 'reset'
+function renderAccountBox() {
+  const box = $('#accountBox');
+  if (!box) return;
+  const st = syncInfo.status;
+  if (st === 'off' || st === 'checking') { box.hidden = true; return; }
+  box.hidden = false;
+  if (st === 'signed-out') {
+    box.innerHTML = `<button class="btn block ghost-light" id="accSignIn">👤 Sign in to sync</button>`;
+    $('#accSignIn').onclick = showAuth;
+  } else {
+    box.innerHTML = `<div class="acc-email" title="${esc(syncInfo.email)}">👤 ${esc(syncInfo.email)}</div><button class="acc-out" id="accOut">Sign out</button>`;
+    $('#accOut').onclick = async () => {
+      if (await confirmBox('Sign out?', 'Records stay on this device. Sign in again to keep syncing.', 'Sign out')) { authSkipped = false; await bridge.sync.signOut(); }
+    };
+  }
+}
+function showAuth() {
+  const el = $('#authScreen');
+  if (!el || !bridge.sync || !bridge.sync.available) return;
+  const s = bridge.sync;
+  const title = { in: 'Sign in', up: 'Create your account', reset: 'Reset password' }[authMode];
+  const sub = {
+    in: 'Sign in to see the same sales and cash records on your phone, PC and the Windows app.',
+    up: 'One account for all your devices. Use an email you can open — it\'s needed if you forget the password.',
+    reset: 'Enter your email and we\'ll send you a link to choose a new password.',
+  }[authMode];
+  el.innerHTML = `<div class="auth-card">
+    <div class="auth-brand"><div class="logo">S</div><div><div class="auth-company">${esc(data.settings.company || 'Sales & Cash Tracker')}</div><div class="muted" style="font-size:12px">Sales &amp; Cash Tracker</div></div></div>
+    <h2>${title}</h2>
+    <p class="muted">${sub}</p>
+    <form id="authForm" autocomplete="on">
+      <label class="field"><span>Email</span><input type="email" name="email" autocomplete="username" required></label>
+      ${authMode !== 'reset' ? `<label class="field"><span>Password</span><input type="password" name="password" autocomplete="${authMode === 'up' ? 'new-password' : 'current-password'}" required minlength="6"></label>` : ''}
+      ${authMode === 'up' ? `<label class="field"><span>Confirm password</span><input type="password" name="password2" autocomplete="new-password" required minlength="6"></label>` : ''}
+      <div class="auth-msg" id="authMsg"></div>
+      <button class="btn primary block auth-go" type="submit">${{ in: 'Sign in', up: 'Create account', reset: 'Send reset link' }[authMode]}</button>
+    </form>
+    <div class="auth-links">
+      ${authMode === 'in' ? `<a href="#" data-mode="reset">Forgot password?</a><span>New here? <a href="#" data-mode="up">Create an account</a></span>` : `<a href="#" data-mode="in">← Back to sign in</a>`}
+    </div>
+    <button class="auth-skip" id="authSkip">Continue without signing in</button>
+  </div>`;
+  el.hidden = false;
+  $$('[data-mode]', el).forEach(a => a.onclick = e => { e.preventDefault(); authMode = a.dataset.mode; showAuth(); });
+  $('#authSkip').onclick = () => { authSkipped = true; hideAuth(); };
+  const f = $('#authForm');
+  const msg = (t, ok) => { const m = $('#authMsg'); m.textContent = t || ''; m.className = 'auth-msg' + (ok ? ' ok' : ''); };
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const email = f.email.value.trim();
+    const btn = $('.auth-go', f);
+    msg('');
+    if (authMode === 'up' && f.password.value !== f.password2.value) { msg('The two passwords don\'t match.'); return; }
+    btn.disabled = true; const label = btn.textContent; btn.textContent = 'Please wait…';
+    try {
+      if (authMode === 'reset') { await s.resetPassword(email); msg('Reset link sent. Check your email (and spam folder).', true); }
+      else if (authMode === 'up') { await s.signUp(email, f.password.value); toast('Account created — syncing'); }
+      else { await s.signIn(email, f.password.value); toast('Signed in — syncing'); }
+    } catch (err) { msg(friendlyError(err)); }
+    btn.disabled = false; btn.textContent = label;
+  };
+  setTimeout(() => f.email.focus(), 30);
+}
+function hideAuth() { const el = $('#authScreen'); if (el) { el.hidden = true; el.innerHTML = ''; } authMode = 'in'; }
 function friendlyError(e) {
   const code = (e && (e.code || e.message)) || String(e);
   const map = {

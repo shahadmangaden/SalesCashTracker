@@ -35,7 +35,7 @@ export function createSync(base, backend) {
   let synced = new Map();      // key -> stable json (or '__deleted__') last known to match server
   let initialPending = 0;      // snapshots still to arrive after sign-in
   let pushing = Promise.resolve();
-  let status = backend ? 'signed-out' : 'off';
+  let status = backend ? 'checking' : 'off';
   let lastError = '';
   const listeners = { remote: [], status: [] };
 
