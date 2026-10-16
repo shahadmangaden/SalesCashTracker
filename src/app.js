@@ -39,6 +39,23 @@ const DEFAULT_LISTS = {
   countries: ['UAE', 'IND', 'PAK', 'BGD', 'NPL', 'LKA', 'PHL', 'KSA', 'OMN', 'QAT', 'BHR', 'KWT', 'EGY', 'JOR', 'TUR', 'GEO', 'ARM', 'AZE', 'THA', 'MYS', 'IDN', 'SGP', 'GBR', 'USA', 'CAN', 'AUS', 'FRA', 'DEU', 'ITA', 'ESP', 'CHE', 'NLD', 'RUS', 'KAZ', 'UZB', 'KEN', 'ETH', 'NGA', 'ZAF', 'CHN', 'JPN', 'KOR', 'MDV', 'AFG', 'IRN', 'IRQ', 'LBN', 'SYR', 'YEM', 'SDN'],
 };
 
+// Sub-products suggested for each product (same list as the Android app); saved as the sale's detail
+const SUB_PRODUCTS = {
+  'FLIGHT TICKET': ['ONE WAY', 'RETURN', 'MULTI CITY', 'DATE CHANGE', 'REISSUE', 'REFUND'],
+  'VISA SERVICE': ['30 DAYS TOURIST', '60 DAYS TOURIST', '90 DAYS TOURIST', 'VISA EXTENSION', 'STATUS CHANGE', 'VISA CANCELLATION'],
+  'VISA CHANGE BY BUS': ['OMAN EXIT', 'OMAN RETURN', 'BUS + 30 DAYS VISA', 'BUS + 60 DAYS VISA'],
+  'KSA MULTIPPLE ENTRY': ['1 YEAR MULTIPLE', 'SINGLE ENTRY', 'UMRAH VISA', 'TRANSIT VISA'],
+  'TYPING CENTER / DOCUMENT SERVICE': ['EMIRATES ID', 'MEDICAL', 'ATTESTATION', 'TRANSLATION', 'TYPING', 'LABOUR / MOHRE'],
+  'HOTEL': ['1 NIGHT', '2 NIGHTS', '3 NIGHTS', 'WEEK STAY', 'MAKKAH', 'MADINAH'],
+  'TOUR PACKAGE': ['DESERT SAFARI', 'CITY TOUR', 'DHOW CRUISE', 'INTERNATIONAL PACKAGE', 'THEME PARK'],
+  'GLOBAL VISA': ['SCHENGEN', 'UK', 'USA', 'CANADA', 'TURKEY', 'GEORGIA', 'AZERBAIJAN', 'THAILAND'],
+  'UMRAH PACKAGE': ['UMRAH BY BUS', 'UMRAH BY FLIGHT', 'VISA ONLY', 'VISA + HOTEL', 'FULL PACKAGE'],
+  'HAJJ PACKAGE': ['ECONOMY', 'STANDARD', 'PREMIUM'],
+  'CAR RENTAL': ['DAILY', 'WEEKLY', 'MONTHLY', 'WITH DRIVER'],
+  'INSURANCE': ['TRAVEL INSURANCE', 'HEALTH INSURANCE', 'VISA INSURANCE', 'CAR INSURANCE'],
+  'OTHER': ['SERVICE CHARGE', 'COURIER', 'MISC'],
+};
+
 function emptyData() {
   return {
     version: 1,
@@ -430,7 +447,7 @@ function openBookingForm(b, isCopy) {
   b = b || {};
   const L = data.lists;
   const agents = [...new Set([...L.agents, ...data.bookings.map(x => x.agent).filter(Boolean)])].sort();
-  const details = [...new Set(data.bookings.map(x => x.detail).filter(Boolean))].sort();
+  const details = [...new Set([...data.bookings.map(x => x.detail).filter(Boolean), ...Object.values(SUB_PRODUCTS).flat()])].sort();
   const f = (label, html, cls = '', req) => `<label class="field ${cls}"><span>${label}${req ? ' <i class="req">*</i>' : ''}</span>${html}</label>`;
   const val = k => esc(b[k] ?? '');
   openModal(`
