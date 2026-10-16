@@ -165,7 +165,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.agentsReport(
             ) {
                 Lc(R.drawable.lc_lightbulb, Glass.Amber, 20.dp)
                 T("Start with ${nice(name)} — ${pctWhole(t.remaining / totalDue)} of your outstanding balance is with this agent.",
-                    11.sp, Glass.Muted, Modifier.weight(1f), maxLines = 3)
+                    11.sp, Glass.Muted, modifier = Modifier.weight(1f), maxLines = 3)
             }
         }
     }
@@ -198,7 +198,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.productsReport(pb: Li
                         Box(Modifier.size(9.dp).clip(RoundedCornerShape(3.dp)).background(DonutColors[i % DonutColors.size]))
                         T(sentence(name), 12.sp, Glass.Ink, FontWeight.Medium, Modifier.weight(1f))
                         T(amt(sales), 12.sp, Glass.Ink, FontWeight.Bold)
-                        T(if (total > 0) pctWhole(sales / total) else "–", 11.sp, Glass.Muted, Modifier.width(36.dp), align = TextAlign.End)
+                        T(if (total > 0) pctWhole(sales / total) else "–", 11.sp, Glass.Muted, modifier = Modifier.width(36.dp), align = TextAlign.End)
                     }
                 }
             }
@@ -276,7 +276,7 @@ private fun VisaCard(b: Booking, d: Long, docTypes: List<DocType>, ctx: android.
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             T(listOfNotNull(days?.let { "$it-day visa" } ?: sentence(b.docType), exp?.let { "Expires ${it.format(shortDay)}" }).joinToString(" · "),
-                11.sp, Glass.Muted, Modifier.weight(1f))
+                11.sp, Glass.Muted, modifier = Modifier.weight(1f))
             if (b.contact.isNotBlank()) {
                 Row(
                     Modifier.clip(RoundedCornerShape(6.dp)).clickable {
@@ -536,7 +536,7 @@ fun ListsEditorSheet(state: AppState) {
                 }
             } else {
                 val (items, update) = sections.first { it.first == section }.third
-                if (items.isEmpty()) T("Nothing here yet — add one above.", 13.sp, Glass.Muted, Modifier.padding(vertical = 12.dp))
+                if (items.isEmpty()) T("Nothing here yet — add one above.", 13.sp, Glass.Muted, modifier = Modifier.padding(vertical = 12.dp))
                 items.forEachIndexed { i, v ->
                     if (i > 0) Box(Modifier.fillMaxWidth().height(0.6.dp).background(Glass.Divider))
                     Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
