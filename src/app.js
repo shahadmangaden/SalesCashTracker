@@ -2,7 +2,7 @@
 'use strict';
 
 // ---------- Storage bridge (Electron preload, or browser fallback for preview) ----------
-const api = window.api || (() => {
+const bridge = window.api || (() => {
   const KEY = 'sct-data';
   return {
     load: async () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch (_) { return null; } },
@@ -129,7 +129,7 @@ let saveTimer = null;
 function persist() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
-    try { await api.save(data); } catch (e) { toast('Could not save: ' + e.message, true); }
+    try { await bridge.save(data); } catch (e) { toast('Could not save: ' + e.message, true); }
   }, 150);
 }
 
@@ -620,7 +620,7 @@ const LIST_DEFS = [
   ['paymentModes', 'Payment Modes'], ['paymentStatuses', 'Payment Statuses'], ['bookingStatuses', 'Booking Statuses'], ['countries', 'Sectors / Destinations'],
 ];
 async function renderSettings(v) {
-  const info = await api.info();
+  const info = await bridge.info();
   v.innerHTML = `
     <div class="card" style="margin-bottom:14px"><h2>Data</h2>
       <p class="muted" style="margin-top:0">Everything is saved automatically on this PC. A dated backup copy is kept every day (last 60 days).</p>
@@ -652,9 +652,9 @@ async function renderSettings(v) {
 
   $('#sImport').onclick = doImport;
   $('#sExport').onclick = doExport;
-  $('#sBackup').onclick = async () => { const p = await api.saveBackup(data); if (p) toast('Backup saved'); };
+  $('#sBackup').onclick = async () => { const p = await bridge.saveBackup(data); if (p) toast('Backup saved'); };
   $('#sRestore').onclick = doRestore;
-  $('#sFolder').onclick = () => api.openDataFolder();
+  $('#sFolder').onclick = () => bridge.openDataFolder();
   $('#sWipe').onclick = async () => {
     if (await confirmBox('Delete ALL bookings and cash entries?', 'Lists and settings are kept. Tip: save a backup first. Today\'s automatic backup also stays in the data folder.', 'Delete everything')) {
       data.bookings = []; data.cash = []; persist(); render(); toast('All records deleted');
@@ -686,7 +686,7 @@ function cashSig(c) { return [c.date, up(c.agent), n0(c.amount)].join('|'); }
 
 async function doImport() {
   let res;
-  try { res = await api.importExcel(); } catch (e) { toast('Import failed: ' + e.message, true); return; }
+  try { res = await bridge.importExcel(); } catch (e) { toast('Import failed: ' + e.message, true); return; }
   if (!res) return;
   if (!res.bookings.length && !res.cash.length) { toast('No bookings found in that file. Is it the tracker workbook?', true); return; }
   const summary = `${res.bookings.length} bookings and ${res.cash.length} cash entries found.`;
@@ -715,12 +715,12 @@ async function doImport() {
 }
 async function doExport() {
   const stamp = todayISO();
-  const p = await api.exportExcel(data, `Sales-Cash-Tracker-${stamp}.xlsx`);
+  const p = await bridge.exportExcel(data, `Sales-Cash-Tracker-${stamp}.xlsx`);
   if (p) toast('Exported to Excel');
 }
 async function doRestore() {
   let d;
-  try { d = await api.restoreBackup(); } catch (e) { toast(e.message, true); return; }
+  try { d = await bridge.restoreBackup(); } catch (e) { toast(e.message, true); return; }
   if (!d) return;
   if (!(await confirmBox('Restore this backup?', `It has ${d.bookings.length} bookings and ${(d.cash || []).length} cash entries. Your current records will be replaced.`, 'Restore'))) return;
   data = normalize(d); persist(); go('dashboard'); toast('Backup restored');
@@ -763,8 +763,8 @@ function normalize(d) {
 }
 
 async function boot() {
-  data = normalize(await api.load());
-  const info = await api.info();
+  data = normalize(await bridge.load());
+  const info = await bridge.info();
   $('#sideFoot').innerHTML = `v${esc(info.version)} · Ctrl+N new sale<br>Data saves automatically`;
   $$('#nav button').forEach(b => b.onclick = () => go(b.dataset.view));
   $('#monthFilter').onchange = e => { ui.month = e.target.value; render(); };
