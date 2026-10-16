@@ -3,21 +3,22 @@
   "productName": "Sales Cash Tracker",
   "version": "1.0.0",
   "description": "Sales & Cash Paid Tracker desktop app for Bakhtar Travels",
-  "main": "main.js",
+  "main": "app-dist/main.js",
   "author": "Sahad M <sahadmangaden@gmail.com>",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder --win nsis portable --publish never"
+    "start": "npm run bundle && electron .",
+    "bundle": "esbuild main.js --bundle --platform=node --target=node20 --external:electron --outfile=app-dist/main.js && esbuild preload.js --bundle --platform=node --external:electron --outfile=app-dist/preload.js",
+    "dist": "npm run bundle && electron-builder --win nsis portable --publish never"
   },
-  "dependencies": {
-    "exceljs": "^4.4.0",
-    "xlsx": "^0.18.5"
-  },
+  "dependencies": {},
   "devDependencies": {
     "electron": "^33.2.1",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.0",
+    "exceljs": "^4.4.0",
+    "xlsx": "^0.18.5"
   },
   "build": {
     "appId": "com.jash.salescashtracker",
@@ -28,12 +29,11 @@
       "buildResources": "build"
     },
     "files": [
-      "main.js",
-      "preload.js",
-      "lib/**",
+      "app-dist/**",
       "src/**",
       "build/icon.png",
-      "package.json"
+      "package.json",
+      "!node_modules/**"
     ],
     "win": {
       "target": [

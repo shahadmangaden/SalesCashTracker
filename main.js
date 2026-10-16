@@ -53,7 +53,7 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 640,
     title: 'Sales & Cash Tracker',
-    icon: path.join(__dirname, 'build', 'icon.png'),
+    icon: path.join(__dirname, '..', 'build', 'icon.png'),
     backgroundColor: '#f4f6fa',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -63,7 +63,7 @@ function createWindow() {
     },
   });
   win.maximize();
-  win.loadFile(path.join(__dirname, 'src', 'index.html'));
+  win.loadFile(path.join(__dirname, '..', 'src', 'index.html'));
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
 }
 
