@@ -5,6 +5,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
@@ -76,33 +78,38 @@ import java.util.Locale
 // ---------- Design tokens (from the Figma file) ----------
 
 object Glass {
-    val Ink = Color(0xFF16243D)
-    val Muted = Color(0xFF64728B)
-    val Blue = Color(0xFF246BFD)
+    // Warm cream + charcoal + mustard theme (from the reference dashboard)
+    val Ink = Color(0xFF1C1C1E)
+    val Muted = Color(0xFF8A857C)
+    val Blue = Color(0xFF1F1F22)          // primary / selected (charcoal)
     val Tint = Blue
-    val BlueBg = Color(0xFFE6EEFF)
-    val Green = Color(0xFF167E65)
-    val GreenBg = Color(0xFFE1F4EC)
-    val Amber = Color(0xFFA26622)
-    val AmberBg = Color(0xFFFFF0D9)
-    val Red = Color(0xFFBD5260)
-    val RedBg = Color(0xFFFFE9ED)
-    val NeutralBg = Color(0xFFE8EDF5)
-    val TileBg = Color(0xFFEDF3FF)
-    val Divider = Color(0xFFD9E2EF)
-    val Track = Color(0xFFDFE7F4)
-    val CloseBg = Color(0xFFE8EEF8)
-    val Fill = Color.White.copy(alpha = 0.66f)
+    val Yellow = Color(0xFFF5C542)        // brand accent
+    val YellowSoft = Color(0xFFFCEFC2)
+    val Charcoal = Color(0xFF1F1F22)
+    val BlueBg = Color(0xFFFCEFC2)
+    val Green = Color(0xFF0E9F6E)
+    val GreenBg = Color(0xFFDDF5EA)
+    val Amber = Color(0xFFB7791F)
+    val AmberBg = Color(0xFFFDF0D2)
+    val Red = Color(0xFFDC2626)
+    val RedBg = Color(0xFFFDE4E4)
+    val NeutralBg = Color(0xFFECE8E0)
+    val TileBg = Color(0xFFF4EFE4)
+    val Divider = Color(0xFFE6E1D8)
+    val Track = Color(0xFFE7E2D8)
+    val CloseBg = Color(0xFFECE8E0)
+    val Fill = Color.White.copy(alpha = 0.9f)
     val Edge = Color.White.copy(alpha = 0.9f)
-    val Shadow = Color(0xFF526F9D)
+    val Shadow = Color(0xFF3A342A)
+    val Cream = Color(0xFFEEEBE5)
 }
 
 val DonutColors = listOf(
-    Color(0xFF246BFD), Color(0xFFA299E9), Color(0xFF7FC9B5), Color(0xFF89B9FA),
-    Color(0xFFF2BD95), Color(0xFFB3BFD3), Color(0xFF5AC8B0), Color(0xFFD3A6E8),
+    Color(0xFFF5C542), Color(0xFF1F1F22), Color(0xFFD9A441), Color(0xFF8A857C),
+    Color(0xFFF2D98C), Color(0xFF4A4A4F), Color(0xFFC9B79C), Color(0xFFE8E2D6),
 )
 
-val AvatarColors = listOf(Color(0xFFDCE8FF), Color(0xFFE9E2FB), Color(0xFFDFF2EA), Color(0xFFFFF0D9))
+val AvatarColors = listOf(Color(0xFFFCEFC2), Color(0xFFECE8E0), Color(0xFFDDF5EA), Color(0xFFF4E3D3))
 
 /** Currency code from the business settings, available everywhere in the UI. */
 val LocalCurrency = compositionLocalOf { "AED" }
@@ -153,15 +160,15 @@ fun productIcon(category: String): Int {
 /** Colourful soft backdrop the glass sits on (the look from the first Liquid Glass version). */
 @Composable
 fun GlassBackground(content: @Composable BoxScope.() -> Unit) {
-    Box(Modifier.fillMaxSize().background(Color(0xFFEFF3FB))) {
+    Box(Modifier.fillMaxSize().background(Glass.Cream)) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width; val h = size.height
             fun blob(c: Color, x: Float, y: Float, r: Float) =
                 drawCircle(Brush.radialGradient(listOf(c, c.copy(alpha = 0f)), center = Offset(x, y), radius = r), r, Offset(x, y))
-            blob(Color(0xFF8EC5FF).copy(alpha = 0.75f), w * 0.05f, h * 0.06f, w * 0.85f)
-            blob(Color(0xFFC6B6FF).copy(alpha = 0.6f), w * 1.0f, h * 0.22f, w * 0.75f)
-            blob(Color(0xFF9FF0DA).copy(alpha = 0.45f), w * 0.15f, h * 0.62f, w * 0.8f)
-            blob(Color(0xFFFFD1E3).copy(alpha = 0.45f), w * 0.95f, h * 0.85f, w * 0.8f)
+            blob(Color(0xFFF5C542).copy(alpha = 0.45f), w * 0.1f, h * 0.02f, w * 0.95f)
+            blob(Color(0xFFF8DE8A).copy(alpha = 0.30f), w * 1.0f, h * 0.18f, w * 0.7f)
+            blob(Color(0xFFFFFFFF).copy(alpha = 0.55f), w * 0.2f, h * 0.65f, w * 0.8f)
+            blob(Color(0xFFF2E3C0).copy(alpha = 0.45f), w * 0.95f, h * 0.9f, w * 0.8f)
         }
         content()
     }
@@ -170,8 +177,8 @@ fun GlassBackground(content: @Composable BoxScope.() -> Unit) {
 /** Frosted glass: white gradient fill, bright fading edge, soft floating shadow. */
 fun Modifier.glass(radius: Dp = 24.dp, alpha: Float = 0.66f, shadow: Boolean = true): Modifier {
     val shape = RoundedCornerShape(radius)
-    val top = (alpha + 0.14f).coerceAtMost(0.95f)
-    val bottom = (alpha - 0.08f).coerceAtLeast(0.3f)
+    val top = (alpha + 0.30f).coerceAtMost(0.98f)
+    val bottom = (alpha + 0.18f).coerceAtMost(0.92f)
     return this
         // Soft raised depth (white highlight + navy shade) from the reference designs
         .softShadow(radius, if (shadow) 5.dp else 3.dp, if (shadow) 14.dp else 8.dp, if (shadow) 0.10f else 0.06f, if (shadow) 0.65f else 0.45f)
@@ -275,12 +282,14 @@ fun Choice(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modif
     Box(
         modifier
             .clip(shape)
-            .background(if (selected) Glass.Blue else Color.White.copy(alpha = 0.61f))
-            .border(1.dp, if (selected) Color.White.copy(alpha = 0.53f) else Glass.Edge, shape)
+            .background(if (selected) Glass.Charcoal else Color.White.copy(alpha = 0.92f))
+            .border(1.dp, if (selected) Glass.Charcoal else Glass.Edge, shape)
             .clickable(onClick = onClick)
-            .padding(horizontal = if (large) 13.dp else 10.dp, vertical = if (large) 9.dp else 7.dp),
+            .heightIn(min = 40.dp)
+            .padding(horizontal = if (large) 14.dp else 12.dp, vertical = if (large) 10.dp else 9.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        T(text, if (large) 13.sp else 12.sp, if (selected) Color.White else Glass.Muted, if (selected) FontWeight.SemiBold else FontWeight.Medium)
+        T(text, 13.sp, if (selected) Color.White else Glass.Ink, if (selected) FontWeight.SemiBold else FontWeight.Medium)
     }
 }
 
@@ -296,8 +305,8 @@ fun StatusPill(text: String, fg: Color, bg: Color, size: TextUnit = 10.sp) {
 fun PaymentPill(status: String, due: Double) {
     when (status.uppercase()) {
         "PAID" -> StatusPill("Paid", Glass.Green, Glass.GreenBg)
-        "PARTIAL" -> StatusPill("Partial", Glass.Blue, Glass.BlueBg)
-        "PENDING" -> StatusPill("Pending", Glass.Muted, Glass.NeutralBg)
+        "PARTIAL" -> StatusPill("Partial", Glass.Amber, Glass.AmberBg)
+        "PENDING" -> StatusPill("Awaiting", Glass.Red, Glass.RedBg)
         "REFUNDED" -> StatusPill("Refunded", Glass.Red, Glass.RedBg)
         else -> if (due > 0.5) StatusPill("Balance due", Glass.Amber, Glass.AmberBg)
     }
@@ -343,6 +352,7 @@ fun GlassInput(
     password: Boolean = false,
     textSize: TextUnit = 14.sp,
     bold: Boolean = false,
+    @DrawableRes leading: Int? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -350,11 +360,12 @@ fun GlassInput(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (label != null) FieldLabel(label)
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 46.dp).clip(shape).background(Color.White.copy(alpha = 0.86f))
-                .border(1.dp, if (focused) Glass.Blue.copy(alpha = 0.55f) else Glass.Edge, shape).padding(horizontal = 14.dp, vertical = 10.dp),
+            Modifier.fillMaxWidth().heightIn(min = 50.dp).clip(shape).recessed(shape)
+                .border(if (focused) 1.5.dp else 1.dp, if (focused) Glass.Yellow else Color.White.copy(alpha = 0.7f), shape).padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            if (leading != null) Lc(leading, Glass.Muted, 18.dp)
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 if (value.isEmpty() && placeholder.isNotEmpty()) T(placeholder, textSize, Glass.Muted.copy(alpha = 0.7f))
                 BasicTextField(
@@ -411,7 +422,7 @@ fun Segments(options: List<Pair<String, String>>, selected: String, onSelect: (S
 
 /** Six-month sales bars: last bar highlighted blue. */
 @Composable
-fun BarChart(values: List<Pair<String, Double>>, modifier: Modifier = Modifier) {
+fun BarChart(values: List<Pair<String, Double>>, modifier: Modifier = Modifier, dark: Boolean = false) {
     val max = (values.maxOfOrNull { it.second } ?: 0.0).coerceAtLeast(1.0)
     Row(modifier.fillMaxWidth().height(96.dp).padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.Bottom) {
         values.forEachIndexed { i, (label, v) ->
@@ -419,9 +430,9 @@ fun BarChart(values: List<Pair<String, Double>>, modifier: Modifier = Modifier) 
             Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {
                 val barMax = 60f
                 val h = (barMax * (v / max).toFloat()).coerceAtLeast(6f)
-                Box(Modifier.fillMaxWidth().height(h.dp).clip(RoundedCornerShape(6.dp)).background(if (on) Glass.Blue else Color(0xA69BB9F4)))
+                Box(Modifier.fillMaxWidth().height(h.dp).clip(RoundedCornerShape(6.dp)).background(if (on) Glass.Yellow else if (dark) Color.White.copy(alpha = 0.16f) else Color(0xFFE2DCCF)))
                 Spacer(Modifier.height(6.dp))
-                T(label, 10.sp, if (on) Glass.Blue else Glass.Muted, if (on) FontWeight.Bold else FontWeight.Normal)
+                T(label, 10.sp, if (on) (if (dark) Glass.Yellow else Glass.Ink) else if (dark) Color.White.copy(alpha = 0.55f) else Glass.Muted, if (on) FontWeight.Bold else FontWeight.Normal)
             }
         }
     }
@@ -518,14 +529,14 @@ fun Modifier.softShadow(radius: Dp, offset: Dp = 6.dp, blur: Dp = 12.dp, darkAlp
                 isAntiAlias = true
                 maskFilter = android.graphics.BlurMaskFilter(b, android.graphics.BlurMaskFilter.Blur.NORMAL)
             }
-            paint.color = android.graphics.Color.argb((darkAlpha * 255).toInt(), 0x0D, 0x27, 0x50)
+            paint.color = android.graphics.Color.argb((darkAlpha * 255).toInt(), 0x3A, 0x34, 0x2A)
             canvas.nativeCanvas.drawRoundRect(o, o, size.width + o, size.height + o, r, r, paint)
             paint.color = android.graphics.Color.argb((lightAlpha * 255).toInt(), 255, 255, 255)
             canvas.nativeCanvas.drawRoundRect(-o, -o, size.width - o, size.height - o, r, r, paint)
         }
     }
 
-private val Raised = Brush.linearGradient(listOf(Color(0xFF3D9BFF), Color(0xFF0A62FF)))
+private val Raised = Brush.linearGradient(listOf(Color(0xFFF8D25A), Color(0xFFF2BE2E)))
 
 // ---------- Date strip (pick a day like a calendar row) ----------
 
@@ -544,16 +555,19 @@ fun DateStrip(selected: String, onSelect: (String) -> Unit, onPickOlder: () -> U
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val pill = RoundedCornerShape(26.dp)
+        val pill = RoundedCornerShape(999.dp)
         Box(
-            Modifier.size(width = 52.dp, height = 68.dp).softShadow(26.dp, 4.dp, 10.dp, 0.12f).clip(pill)
+            Modifier.size(width = 52.dp, height = 78.dp).softShadow(26.dp, 4.dp, 10.dp, 0.12f).clip(pill)
                 .background(Color.White.copy(alpha = 0.9f)).border(1.dp, Glass.Edge, pill).clickable(onClick = onPickOlder),
             contentAlignment = Alignment.Center,
         ) { Lc(R.drawable.lc_calendar, Glass.Blue, 22.dp, description = "Pick an older date") }
         days.forEach { d ->
             val on = d == sel
+            val scale by androidx.compose.animation.core.animateFloatAsState(
+                if (on) 1.08f else 1f, androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 400f), label = "day",
+            )
             Column(
-                Modifier.size(width = 52.dp, height = if (on) 76.dp else 68.dp)
+                Modifier.size(width = 52.dp, height = 78.dp).graphicsLayer { scaleX = scale; scaleY = scale }
                     .softShadow(26.dp, if (on) 6.dp else 4.dp, 12.dp, if (on) 0.22f else 0.10f)
                     .clip(pill)
                     .background(if (on) Raised else Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.75f))))
@@ -562,63 +576,178 @@ fun DateStrip(selected: String, onSelect: (String) -> Unit, onPickOlder: () -> U
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
             ) {
-                T(d.dayOfMonth.toString(), 20.sp, if (on) Color.White else Glass.Ink, FontWeight.Bold)
-                T(if (d == today) "Today" else d.format(stripDay), 10.sp, if (on) Color.White.copy(alpha = 0.9f) else Glass.Muted, FontWeight.Medium)
+                T(d.dayOfMonth.toString(), 18.sp, Glass.Ink, FontWeight.Bold)
+                T(if (d == today) "Today" else d.format(stripDay), 10.sp, if (on) Glass.Ink else Glass.Muted, if (on) FontWeight.Bold else FontWeight.Medium)
             }
         }
     }
 }
 
-// ---------- Product tiles ----------
+// ---------- Product bento grid ----------
 
-/** Products as raised icon tiles, three per row. */
+/** Products as a 2-column bento grid: round icon badge top-left, label below, check badge when selected. */
 @Composable
 fun ProductGrid(options: List<String>, selected: String, onSelect: (String) -> Unit, extra: (@Composable (Modifier) -> Unit)? = null) {
     val cells: List<String?> = options + (if (extra != null) listOf(null) else emptyList())
     Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        cells.chunked(3).forEach { row ->
+        cells.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { o ->
-                    val m = Modifier.weight(1f).heightIn(min = 84.dp)
+                    val m = Modifier.weight(1f).heightIn(min = 92.dp)
                     if (o == null) extra?.invoke(m) else {
                         val on = o == selected
                         val shape = RoundedCornerShape(20.dp)
-                        Column(
-                            m.softShadow(20.dp, if (on) 6.dp else 4.dp, 12.dp, if (on) 0.22f else 0.10f).clip(shape)
-                                .background(if (on) Raised else Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.72f))))
-                                .border(1.dp, if (on) Color.White.copy(alpha = 0.5f) else Glass.Edge, shape)
-                                .clickable { onSelect(o) }.padding(horizontal = 6.dp, vertical = 10.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+                        Box(
+                            m.then(if (on) Modifier else Modifier.softShadow(20.dp, 5.dp, 14.dp, 0.10f, 0.9f)).clip(shape)
+                                .then(if (on) Modifier.recessed(shape, Glass.YellowSoft) else Modifier.background(Color.White))
+                                .border(if (on) 2.dp else 1.dp, if (on) Glass.Charcoal else Glass.Edge, shape)
+                                .clickable { onSelect(o) },
                         ) {
-                            Box(
-                                Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(if (on) Color.White.copy(alpha = 0.22f) else Glass.TileBg),
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Box(
+                                    Modifier.size(38.dp).clip(CircleShape).background(if (on) Glass.Yellow else Glass.TileBg),
+                                    contentAlignment = Alignment.Center,
+                                ) { Lc(productIcon(o), Glass.Ink, 19.dp) }
+                                T(sentence(o), 13.sp, Glass.Ink, FontWeight.SemiBold, maxLines = 2)
+                            }
+                            if (on) Box(
+                                Modifier.align(Alignment.TopEnd).padding(10.dp).size(22.dp).clip(CircleShape).background(Glass.Charcoal),
                                 contentAlignment = Alignment.Center,
-                            ) { Lc(productIcon(o), if (on) Color.White else Glass.Blue, 20.dp) }
-                            T(sentence(o), 11.sp, if (on) Color.White else Glass.Ink, FontWeight.SemiBold, maxLines = 2, align = TextAlign.Center)
+                            ) { Lc(R.drawable.lc_check, Glass.Yellow, 13.dp) }
                         }
                     }
                 }
-                repeat(3 - row.size) { Box(Modifier.weight(1f)) }
+                repeat(2 - row.size) { Box(Modifier.weight(1f)) }
             }
         }
     }
 }
 
-/** Primary button with the raised blue gradient and soft depth. */
+/** Pressed-in (recessed) surface: darker top edge fading to the fill, like a soft inner shadow. */
+fun Modifier.recessed(shape: androidx.compose.ui.graphics.Shape, fill: Color = Color(0xFFF1EEE8)): Modifier =
+    this.background(fill, shape).drawWithContent {
+        drawContent()
+        drawRect(Brush.verticalGradient(listOf(Color(0x24302A20), Color.Transparent), endY = 14.dp.toPx()))
+        drawRect(Brush.horizontalGradient(listOf(Color(0x14302A20), Color.Transparent), endX = 10.dp.toPx()))
+        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0x66FFFFFF)), startY = size.height - 8.dp.toPx()))
+    }
+
+/** Main save button: charcoal with a mustard check badge and soft depth. */
 @Composable
 fun SubmitButton(text: String, @DrawableRes icon: Int?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(100.dp)
     Row(
-        modifier.fillMaxWidth().heightIn(min = 56.dp).softShadow(100.dp, 6.dp, 16.dp, 0.25f, 0.8f).clip(shape).background(Raised)
-            .border(1.dp, Color.White.copy(alpha = 0.45f), shape).clickable(onClick = onClick).padding(vertical = 14.dp),
+        modifier.fillMaxWidth().heightIn(min = 56.dp).softShadow(100.dp, 6.dp, 16.dp, 0.28f, 0.8f).clip(shape)
+            .background(Brush.verticalGradient(listOf(Color(0xFF2C2C30), Glass.Charcoal)))
+            .clickable(onClick = onClick).padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Box(Modifier.size(28.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) { Lc(icon, Color.White, 18.dp) }
+            Box(Modifier.size(28.dp).clip(CircleShape).background(Glass.Yellow), contentAlignment = Alignment.Center) { Lc(icon, Glass.Ink, 17.dp) }
             Spacer(Modifier.width(10.dp))
         }
         T(text, 17.sp, Color.White, FontWeight.Bold)
+    }
+}
+
+/** Folder-tab segmented control with coloured status dots. */
+@Composable
+fun StatusTabs(options: List<Triple<String, String, Color>>, selected: String, onSelect: (String) -> Unit) {
+    val track = RoundedCornerShape(18.dp)
+    Row(
+        Modifier.fillMaxWidth().clip(track).recessed(track, Color(0xFFE9E5DD)).padding(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEach { (key, label, dot) ->
+            val on = key == selected
+            val tab = RoundedCornerShape(14.dp)
+            Row(
+                Modifier.weight(1f).heightIn(min = 48.dp)
+                    .then(if (on) Modifier.softShadow(14.dp, 3.dp, 8.dp, 0.14f, 0.6f) else Modifier)
+                    .clip(tab).background(if (on) Color.White else Color.Transparent).clickable { onSelect(key) }
+                    .padding(horizontal = 6.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
+                Spacer(Modifier.width(6.dp))
+                T(label, 12.sp, if (on) Glass.Ink else Glass.Muted, if (on) FontWeight.Bold else FontWeight.Medium, maxLines = 2)
+            }
+        }
+    }
+}
+
+/** Payment-mode icon cards, four per row. */
+@Composable
+fun ModeCards(options: List<Pair<String, Int>>, selected: String, onSelect: (String) -> Unit, label: (String) -> String) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        options.chunked(4).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { (key, icon) ->
+                    val on = key == selected
+                    val shape = RoundedCornerShape(16.dp)
+                    Column(
+                        Modifier.weight(1f).heightIn(min = 78.dp)
+                            .then(if (on) Modifier else Modifier.softShadow(16.dp, 4.dp, 10.dp, 0.10f, 0.9f))
+                            .clip(shape)
+                            .then(if (on) Modifier.recessed(shape, Glass.YellowSoft) else Modifier.background(Color.White))
+                            .border(if (on) 2.dp else 1.dp, if (on) Glass.Charcoal else Glass.Edge, shape)
+                            .clickable { onSelect(key) }.padding(horizontal = 4.dp, vertical = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+                    ) {
+                        Box(Modifier.size(30.dp).clip(CircleShape).background(if (on) Glass.Yellow else Glass.TileBg), contentAlignment = Alignment.Center) {
+                            Lc(icon, Glass.Ink, 16.dp)
+                        }
+                        T(label(key), 10.sp, Glass.Ink, if (on) FontWeight.Bold else FontWeight.Medium, maxLines = 2, align = TextAlign.Center)
+                    }
+                }
+                repeat(4 - row.size) { Box(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/** Chip with a dashed outline (used for "+ Add"). */
+@Composable
+fun DashedChip(text: String, onClick: () -> Unit) {
+    Box(
+        Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(100.dp)).clickable(onClick = onClick)
+            .drawBehind {
+                drawRoundRect(
+                    Glass.Muted, cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2),
+                    style = Stroke(1.5.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f))),
+                )
+            }.padding(horizontal = 14.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center,
+    ) { T(text, 13.sp, Glass.Ink, FontWeight.SemiBold) }
+}
+
+/** Interlocking folder tabs sitting on a white card (Paid / Unpaid / Cash on Home). */
+@Composable
+fun FolderTabs(tabs: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    val idx = tabs.indexOfFirst { it.first == selected }
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+            tabs.forEach { (key, label) ->
+                val on = key == selected
+                Box(
+                    Modifier.weight(1f).clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+                        .background(if (on) Color.White else Color.White.copy(alpha = 0.38f))
+                        .clickable { onSelect(key) }.heightIn(min = 48.dp).padding(vertical = if (on) 14.dp else 11.dp),
+                    contentAlignment = Alignment.Center,
+                ) { T(label, if (on) 14.sp else 12.sp, if (on) Glass.Ink else Glass.Muted, if (on) FontWeight.Bold else FontWeight.Medium) }
+            }
+        }
+        val shape = RoundedCornerShape(
+            topStart = if (idx == 0) 0.dp else 24.dp, topEnd = if (idx == tabs.lastIndex) 0.dp else 24.dp,
+            bottomStart = 24.dp, bottomEnd = 24.dp,
+        )
+        Column(
+            Modifier.fillMaxWidth().softShadow(24.dp, 5.dp, 14.dp, 0.10f, 0.5f).clip(shape).background(Color.White).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            content = content,
+        )
     }
 }

@@ -178,24 +178,24 @@ private fun FloatingNav(state: AppState, modifier: Modifier) {
                 val on = state.tab == t
                 Column(
                     Modifier.weight(1f).fillMaxHeight().clip(pill)
-                        .background(if (on) Color(0x1F0A84FF) else Color.Transparent)
+                        .background(if (on) Glass.Yellow else Color.Transparent)
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { state.tab = t },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
                 ) {
-                    Lc(t.icon, if (on) Glass.Blue else Glass.Muted, 21.dp, description = t.label)
-                    T(t.label, 9.sp, if (on) Glass.Blue else Glass.Muted, if (on) FontWeight.Bold else FontWeight.Medium)
+                    Lc(t.icon, if (on) Glass.Ink else Glass.Muted, 21.dp, description = t.label)
+                    T(t.label, 9.sp, if (on) Glass.Ink else Glass.Muted, if (on) FontWeight.Bold else FontWeight.Medium)
                 }
             }
         }
         Box(
             Modifier.size(68.dp)
-                .shadow(14.dp, CircleShape, ambientColor = Color(0xFF3B609D).copy(alpha = 0.14f), spotColor = Color(0xFF246BFD).copy(alpha = 0.35f))
+                .shadow(14.dp, CircleShape, ambientColor = Color(0xFF3B609D).copy(alpha = 0.14f), spotColor = Color(0xFF1F1F22).copy(alpha = 0.35f))
                 .clip(CircleShape).background(Color.White.copy(alpha = 0.85f)).padding(6.dp).clip(CircleShape)
-                .background(Brush.linearGradient(listOf(Color(0xFF3D9BFF), Color(0xFF0A62FF))))
+                .background(Brush.linearGradient(listOf(Color(0xFFF8D25A), Color(0xFFF2BE2E))))
                 .clickable { state.push(Route.QuickAdd) },
             contentAlignment = Alignment.Center,
-        ) { Lc(R.drawable.lc_plus, Color.White, 28.dp, description = "Add") }
+        ) { Lc(R.drawable.lc_plus, Glass.Ink, 28.dp, description = "Add") }
     }
 }
 

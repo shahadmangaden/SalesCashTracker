@@ -24,6 +24,15 @@ import com.jash.salescashtracker.R
 import com.jash.salescashtracker.data.Repository
 import com.jash.salescashtracker.data.Totals
 import com.jash.salescashtracker.data.dueAfterCash
+import com.jash.salescashtracker.data.statusWith
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.runtime.remember
 import java.time.LocalTime
 import java.time.YearMonth
@@ -44,6 +53,7 @@ fun HomeScreen(state: AppState) {
     // Balance still due on this period's sales after agents' cash payments are applied
     val dueMap = remember(bookings, cash) { dueAfterCash(bookings, cash) }
     val balanceDue = pb.sumOf { dueMap[it.id] ?: (it.balance ?: 0.0) }
+    var homeTab by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("unpaid") }
     val hour = LocalTime.now().hour
     val greet = when { hour < 12 -> "Good morning"; hour < 17 -> "Good afternoon"; else -> "Good evening" }
     val firstName = nice(settings.user.split(" ").firstOrNull() ?: "")
@@ -92,22 +102,41 @@ fun HomeScreen(state: AppState) {
             }
         }
 
-        // Hero card
+        // Hero card (charcoal bento card with a collection ring)
         item {
-            GlassCard(spacing = 8.dp, onClick = { state.tab = Tab.Reports }) {
-                Row(verticalAlignment = Alignment.Top) {
-                    T("Total sales $code", 13.sp, Glass.Muted, FontWeight.SemiBold, Modifier.weight(1f))
-                    Lc(R.drawable.lc_arrow_up_right, Glass.Blue, 17.dp)
-                }
+            val collected = if (t.sales > 0) ((t.sales - balanceDue) / t.sales).coerceIn(0.0, 1.0) else 0.0
+            val shape = RoundedCornerShape(28.dp)
+            Column(
+                Modifier.fillMaxWidth().softShadow(28.dp, 8.dp, 20.dp, 0.25f, 0.7f).clip(shape)
+                    .background(Brush.linearGradient(listOf(Color(0xFF2A2A2E), Color(0xFF18181B))))
+                    .clickable { state.tab = Tab.Reports }.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    T(amt(t.sales), 38.sp, Glass.Ink, FontWeight.Bold, Modifier.weight(1f))
-                    if (growth != null) {
-                        if (growth >= 0) StatusPill("↗ ${pct(growth)}", Glass.Green, Glass.GreenBg, 11.sp)
-                        else StatusPill("↘ ${pct(-growth)}", Glass.Red, Glass.RedBg, 11.sp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        T("Total sales · $code", 13.sp, Color.White.copy(alpha = 0.65f), FontWeight.SemiBold)
+                        T(amt(t.sales), 38.sp, Color.White, FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            T("Profit ${cur(t.profit, code)}", 12.sp, Glass.Yellow, FontWeight.SemiBold)
+                            if (growth != null) StatusPill(if (growth >= 0) "↗ ${pct(growth)}" else "↘ ${pct(-growth)}", Glass.Ink, Glass.Yellow, 10.sp)
+                        }
+                    }
+                    Box(Modifier.size(78.dp), contentAlignment = Alignment.Center) {
+                        androidx.compose.foundation.Canvas(Modifier.size(78.dp)) {
+                            val sw = 8.dp.toPx()
+                            val tl = androidx.compose.ui.geometry.Offset(sw / 2, sw / 2)
+                            val sz = androidx.compose.ui.geometry.Size(size.width - sw, size.height - sw)
+                            drawArc(Color.White.copy(alpha = 0.14f), -90f, 360f, false, tl, sz, style = androidx.compose.ui.graphics.drawscope.Stroke(sw))
+                            drawArc(Glass.Yellow, -90f, (360f * collected).toFloat(), false, tl, sz,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            T("${Math.round(collected * 100)}%", 16.sp, Color.White, FontWeight.Bold)
+                            T("collected", 9.sp, Color.White.copy(alpha = 0.6f))
+                        }
                     }
                 }
-                T("Profit ${cur(t.profit, code)}  ·  ${pctWhole(t.margin)} margin", 12.sp, Glass.Muted)
-                BarChart(chart)
+                BarChart(chart, dark = true)
             }
         }
 
@@ -150,27 +179,39 @@ fun HomeScreen(state: AppState) {
             }
         }
 
-        // Recent activity
+        // Paid / Unpaid / Cash folder tabs with a timeline
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionHeading("Recent activity", if (activity.isNotEmpty()) "See all" else null) { state.tab = Tab.Sales }
-                GlassCard(padding = PaddingValues(12.dp), spacing = 4.dp) {
-                    if (activity.isEmpty()) {
-                        T("You're starting fresh", 14.sp, Glass.Ink, FontWeight.SemiBold)
-                        T("Tap the blue + to add your first sale or cash payment.", 12.sp, Glass.Muted, maxLines = 3)
-                    }
-                    activity.forEach { a ->
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = a.open).padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Lc(a.icon, if (a.cash) Glass.Green else Glass.Blue, 20.dp)
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                T(a.title, 12.sp, Glass.Ink, FontWeight.SemiBold)
-                                T(a.sub, 10.sp, Glass.Muted)
+            val paidSales = pb.filter { b -> b.statusWith(dueMap[b.id] ?: (b.balance ?: 0.0)) == "PAID" }
+            val unpaidSales = pb.filter { b -> (dueMap[b.id] ?: (b.balance ?: 0.0)) > 0.5 }
+            data class Line(val sort: String, val date: String, @DrawableRes val icon: Int, val title: String, val sub: String, val amount: String, val color: Color, val open: () -> Unit)
+            val lines = when (homeTab) {
+                "paid" -> paidSales.map { b -> Line(b.date + b.createdAt, b.date, productIcon(b.category), nice(b.customer), listOf(sentence(b.category), nice(b.agent)).filter { it.isNotBlank() }.joinToString(" · "), cur(b.sellingPrice, code), Glass.Ink) { state.push(Route.EditSale(b)) } }
+                "cash" -> pc.map { c -> Line(c.date + c.createdAt, c.date, R.drawable.lc_wallet, nice(c.agent).ifBlank { "No agent" }, sentence(c.mode), "+" + cur(c.amount, code), Glass.Green) { state.push(Route.EditCash(c)) } }
+                else -> unpaidSales.map { b -> Line(b.date + b.createdAt, b.date, productIcon(b.category), nice(b.customer), "Due ${cur(dueMap[b.id] ?: 0.0, code)} · ${nice(b.agent)}", cur(b.sellingPrice, code), Glass.Red) { state.push(Route.EditSale(b)) } }
+            }.sortedByDescending { it.sort }.take(8)
+            FolderTabs(
+                listOf("paid" to "Paid · ${paidSales.size}", "unpaid" to "Unpaid · ${unpaidSales.size}", "cash" to "Cash · ${pc.size}"),
+                homeTab, { homeTab = it },
+            ) {
+                if (lines.isEmpty()) T(if (bookings.isEmpty()) "Tap + to add your first sale or cash payment." else "Nothing here for this month.", 12.sp, Glass.Muted, maxLines = 2, modifier = Modifier.padding(vertical = 8.dp))
+                lines.forEachIndexed { i, l ->
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = l.open), verticalAlignment = Alignment.Top) {
+                        // timeline: date + dashed connector
+                        Column(Modifier.width(44.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            T(runCatching { java.time.LocalDate.parse(l.date.take(10)).dayOfMonth.toString() }.getOrDefault(""), 15.sp, Glass.Ink, FontWeight.Bold)
+                            T(runCatching { java.time.LocalDate.parse(l.date.take(10)).format(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)) }.getOrDefault(""), 10.sp, Glass.Muted)
+                            if (i < lines.lastIndex) androidx.compose.foundation.Canvas(Modifier.width(2.dp).height(18.dp)) {
+                                drawLine(Glass.Divider, androidx.compose.ui.geometry.Offset(size.width / 2, 0f), androidx.compose.ui.geometry.Offset(size.width / 2, size.height),
+                                    strokeWidth = 2f, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
                             }
-                            T(a.amount, 13.sp, if (a.cash) Glass.Green else Glass.Ink, FontWeight.Bold)
+                        }
+                        Row(Modifier.weight(1f).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(Modifier.size(34.dp).clip(CircleShape).background(Glass.TileBg), contentAlignment = Alignment.Center) { Lc(l.icon, Glass.Ink, 17.dp) }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                T(l.title.ifBlank { "—" }, 13.sp, Glass.Ink, FontWeight.SemiBold)
+                                T(l.sub, 10.sp, Glass.Muted)
+                            }
+                            T(l.amount, 13.sp, l.color, FontWeight.Bold)
                         }
                     }
                 }

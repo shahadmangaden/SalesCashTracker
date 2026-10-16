@@ -3,6 +3,12 @@ package com.jash.salescashtracker.ui
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -118,8 +124,8 @@ fun DateChoices(label: String, iso: String, onChange: (String) -> Unit) {
 }
 
 @Composable
-private fun TextAction(text: String, color: Color = Glass.Blue, onClick: () -> Unit) {
-    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+private fun TextAction(text: String, color: Color = Glass.Ink, modifier: Modifier = Modifier.fillMaxWidth(), onClick: () -> Unit) {
+    Box(modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
         T(text, 14.sp, color, FontWeight.SemiBold)
     }
 }
@@ -127,6 +133,55 @@ private fun TextAction(text: String, color: Color = Glass.Blue, onClick: () -> U
 @Composable
 private fun ErrorText(text: String) {
     if (text.isNotEmpty()) T(text, 12.sp, Glass.Red, FontWeight.SemiBold, maxLines = 2)
+}
+
+private const val MORE = "__MORE__"
+
+/** Friendly names for the payment-mode cards. */
+private fun modeLabel(k: String, expanded: Boolean): String = when (k) {
+    MORE -> if (expanded) "Less" else "More"
+    "CASH" -> "Cash on Hand"
+    "BANK TRANSFER" -> "Direct Transfer"
+    "CDM DEPOSIT" -> "Deposit / POS"
+    "CREDIT CARD", "DEBIT CARD" -> sentence(k)
+    else -> sentence(k)
+}
+
+private fun modeIcon(k: String, expanded: Boolean): Int = when {
+    k == MORE -> if (expanded) R.drawable.lc_chevron_down else R.drawable.lc_layout_grid
+    k == "CASH" -> R.drawable.lc_banknote
+    k == "BANK TRANSFER" -> R.drawable.lc_landmark
+    k == "CDM DEPOSIT" -> R.drawable.lc_receipt
+    "CARD" in k -> R.drawable.lc_credit_card
+    "LINK" in k || "ONLINE" in k -> R.drawable.lc_smartphone
+    "WALLET" in k -> R.drawable.lc_wallet
+    else -> R.drawable.lc_circle_dollar_sign
+}
+
+/** Opens WhatsApp (or any share target) with a short receipt for the sale. */
+private fun sendReceipt(ctx: android.content.Context, b: Booking, code: String, company: String) {
+    val text = buildString {
+        appendLine("*${company.ifBlank { "Receipt" }}*")
+        appendLine("Receipt · ${labelDate(b.date)}")
+        appendLine()
+        appendLine("Customer: ${nice(b.customer)}")
+        if (b.category.isNotBlank()) appendLine("Service: ${sentence(b.category)}" + if (b.detail.isNotBlank()) " – ${nice(b.detail)}" else "")
+        if (b.pnr.isNotBlank()) appendLine("PNR: ${b.pnr}")
+        appendLine("Amount: $code ${amt(b.sellingPrice)}")
+        appendLine("Paid: $code ${amt(b.amountPaid ?: 0.0)}")
+        val bal = (b.balance ?: 0.0)
+        if (bal > 0.5) appendLine("Balance: $code ${amt(bal)}")
+        appendLine()
+        append("Thank you!")
+    }
+    val digits = b.contact.filter { it.isDigit() }
+    val intent = if (digits.length >= 8)
+        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/$digits?text=" + android.net.Uri.encode(text)))
+    else android.content.Intent(android.content.Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(android.content.Intent.EXTRA_TEXT, text); setPackage("com.whatsapp") }
+    try { ctx.startActivity(intent) } catch (e: Exception) {
+        ctx.startActivity(android.content.Intent.createChooser(
+            android.content.Intent(android.content.Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(android.content.Intent.EXTRA_TEXT, text) }, "Send receipt"))
+    }
 }
 
 // ---------- Quick add chooser ----------
@@ -163,6 +218,7 @@ private fun QuickOption(icon: Int, bg: Color, tint: Color, title: String, sub: S
 fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
     val lists by Repository.lists.collectAsStateWithLifecycle()
     val all by Repository.bookings.collectAsStateWithLifecycle()
+    val settings by Repository.settings.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
     val code = LocalCurrency.current
     val existing = original != null && !isCopy && all.any { it.id == original.id }
@@ -219,102 +275,147 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
     )
     val live = build()
 
-    fun save(again: Boolean) {
+    fun save(again: Boolean, whatsapp: Boolean = false) {
         if (customer.isBlank()) { error = "Enter the customer name"; return }
         if (sell == null) { error = "Enter the selling price"; return }
         val rec = build()
         Repository.saveBooking(rec)
+        if (whatsapp) sendReceipt(ctx, rec, code, settings.company)
         Toast.makeText(ctx, if (existing) "Sale updated" else "Sale saved", Toast.LENGTH_SHORT).show()
         if (again) state.replaceTop(Route.EditSale(Booking(date = rec.date, agent = rec.agent, category = rec.category, paymentMode = rec.paymentMode, customerType = rec.customerType)))
         else state.pop()
     }
 
-    SheetFrame(if (existing) "Edit sale" else "New sale", onClose = { state.pop() }, footer = {
+    SheetFrame(if (existing) "Edit sale" else "New sale", onClose = { state.pop() }, spacing = 14.dp, footer = {
         ErrorText(error)
         SubmitButton(if (existing) "Save changes" else "Save sale", R.drawable.lc_check, { save(false) })
-        if (!existing) TextAction("Save & add another") { save(true) }
+        Row(Modifier.fillMaxWidth()) {
+            if (!existing) TextAction("Save & add another", Glass.Ink, Modifier.weight(1f)) { save(true) }
+            TextAction("Save & send WhatsApp", Glass.Green, Modifier.weight(1f)) { save(false, whatsapp = true) }
+        }
     }) {
         ErrorText(error)
         DateChoices("Sale date", date) { date = it }
 
         GlassInput("Customer name", customer, { customer = it; error = "" }, placeholder = "Customer name",
-            icon = R.drawable.lc_user_round, caps = KeyboardCapitalization.Words)
+            leading = R.drawable.lc_user_round, caps = KeyboardCapitalization.Words)
 
-        val agentOptions = ranked(all.map { it.agent }, lists.agents, 5).let { if (agent.isNotBlank() && agent !in it) listOf(agent) + it else it }
-        ChoiceGroup("Agent", agentOptions, agent, { agent = it; addAgent = false }, display = ::nice) {
-            Choice("+ Add", addAgent, { addAgent = !addAgent; if (addAgent) agent = "" })
+        // Agent: scrollable chips with a dashed "+ Add"
+        val agentOptions = ranked(all.map { it.agent }, lists.agents, 8).let { if (agent.isNotBlank() && agent !in it && !addAgent) listOf(agent) + it else it }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            FieldLabel("Agent")
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                agentOptions.forEach { o -> Choice(nice(o), o == agent && !addAgent, { agent = if (agent == o) "" else o; addAgent = false }, large = true) }
+                DashedChip(if (addAgent) "Cancel" else "+ Add") { addAgent = !addAgent; if (addAgent) agent = "" }
+            }
         }
-        if (addAgent) GlassInput(null, agent, { agent = it }, placeholder = "New agent name", caps = KeyboardCapitalization.Characters)
+        AnimatedVisibility(addAgent) { GlassInput(null, agent, { agent = it }, placeholder = "New agent name", caps = KeyboardCapitalization.Characters) }
 
+        // Products: 2-column bento grid
         val productOptions = if (allProducts) lists.categories else
-            ranked(all.map { it.category }, lists.categories, 5).let { if (category.isNotBlank() && category !in it) listOf(category) + it else it }
+            ranked(all.map { it.category }, lists.categories, 5).let { if (category.isNotBlank() && category !in it) listOf(category) + it.take(4) else it }
         FieldLabel("Product")
         ProductGrid(productOptions, category, { if (category != it) { category = it; detail = ""; otherSub = false } }) { m ->
             val shape = RoundedCornerShape(20.dp)
             Column(
-                m.clip(shape).background(Color.White.copy(alpha = 0.5f)).border(1.dp, Glass.Edge, shape).clickable { allProducts = !allProducts }.padding(10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+                m.clip(shape).background(Color.White.copy(alpha = 0.55f)).border(1.dp, Glass.Edge, shape).clickable { allProducts = !allProducts }.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Lc(if (allProducts) R.drawable.lc_chevron_down else R.drawable.lc_plus, Glass.Blue, 22.dp, if (allProducts) Modifier.rotate(180f) else Modifier)
-                T(if (allProducts) "Fewer" else "All products", 11.sp, Glass.Blue, FontWeight.SemiBold)
+                Box(Modifier.size(38.dp).clip(CircleShape).background(Glass.Charcoal), contentAlignment = Alignment.Center) {
+                    Lc(if (allProducts) R.drawable.lc_chevron_down else R.drawable.lc_layout_grid, Glass.Yellow, 18.dp, if (allProducts) Modifier.rotate(180f) else Modifier)
+                }
+                T(if (allProducts) "Fewer products" else "All products", 13.sp, Glass.Ink, FontWeight.SemiBold)
             }
         }
 
         // Sub-product (stored in the sale's detail field)
-        if (category.isNotBlank()) {
-            val used = all.filter { it.category == category }.map { it.detail }
-            val subs = ranked(used, SUB_PRODUCTS[category.uppercase()] ?: emptyList(), 8)
-                .let { if (detail.isNotBlank() && detail !in it && !otherSub) listOf(detail) + it else it }
-            ChoiceGroup("${sentence(category)} · type", subs, detail, { detail = if (detail == it) "" else it; otherSub = false }) {
-                Choice("+ Other", otherSub, { otherSub = !otherSub; if (otherSub) detail = "" })
+        AnimatedVisibility(category.isNotBlank()) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val used = all.filter { it.category == category }.map { it.detail }
+                val subs = ranked(used, SUB_PRODUCTS[category.uppercase()] ?: emptyList(), 8)
+                    .let { if (detail.isNotBlank() && detail !in it && !otherSub) listOf(detail) + it else it }
+                ChoiceGroup("${sentence(category)} · type", subs, detail, { detail = if (detail == it) "" else it; otherSub = false }) {
+                    DashedChip(if (otherSub) "Cancel" else "+ Other") { otherSub = !otherSub; if (otherSub) detail = "" }
+                }
+                if (otherSub) GlassInput(null, detail, { detail = it }, placeholder = "Type the service, e.g. DXB-COK RETURN", caps = KeyboardCapitalization.Characters)
             }
-            if (otherSub) GlassInput(null, detail, { detail = it }, placeholder = "Type the service, e.g. DXB-COK RETURN", caps = KeyboardCapitalization.Characters)
         }
 
+        // Price + live profit
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            GlassInput("Selling price · $code", selling, { selling = it; error = "" }, Modifier.weight(1f), placeholder = "0", keyboard = KeyboardType.Decimal)
+            GlassInput("Selling price · $code", selling, { selling = it; error = "" }, Modifier.weight(1f), placeholder = "0", keyboard = KeyboardType.Decimal, bold = true)
             GlassInput("Net cost · $code", cost, { cost = it }, Modifier.weight(1f), placeholder = "0", keyboard = KeyboardType.Decimal)
         }
-        live.profit?.let { p ->
+        AnimatedVisibility(live.profit != null) {
+            val p = live.profit ?: 0.0
             val good = p >= 0
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 37.dp).clip(RoundedCornerShape(12.dp)).background(if (good) Glass.GreenBg else Glass.RedBg).padding(horizontal = 13.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                T(if (good) "Your profit" else "Loss", 12.sp, if (good) Glass.Green else Glass.Red, FontWeight.SemiBold, Modifier.weight(1f))
-                T("${cur(p, code)}  ·  ${pctWhole(live.margin ?: 0.0)}", 14.sp, if (good) Glass.Green else Glass.Red, FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                Row(
+                    Modifier.clip(RoundedCornerShape(100.dp)).background(if (good) Glass.GreenBg else Glass.RedBg).padding(horizontal = 16.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(if (good) Glass.Green else Glass.Red))
+                    Spacer(Modifier.width(8.dp))
+                    T("Profit: ${if (good) "+" else "−"}${amt(Math.abs(p))} $code (${pctWhole(live.margin ?: 0.0)})", 13.sp, if (good) Glass.Green else Glass.Red, FontWeight.Bold)
+                }
             }
         }
 
-        ChoiceGroup("Payment status", listOf("PAID", "PARTIAL", "PENDING"), pay, { pay = it },
-            display = { when (it) { "PAID" -> "Fully paid"; "PARTIAL" -> "Partly paid"; else -> "Not paid" } })
-        if (pay == "PARTIAL") {
-            GlassInput(null, partial, { partial = it }, placeholder = "Amount received", keyboard = KeyboardType.Decimal)
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 34.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.86f)).padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                T("Received · ${cur(parseNum(partial) ?: 0.0, code)}", 12.sp, Glass.Muted, modifier = Modifier.weight(1f))
-                T("Due ${amt(live.balance ?: 0.0)}", 12.sp, Glass.Blue, FontWeight.SemiBold)
-            }
+        // Payment status: folder-tab control with coloured dots
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            FieldLabel("Payment status")
+            StatusTabs(
+                listOf(
+                    Triple("PAID", "Paid in Full", Glass.Green),
+                    Triple("PARTIAL", "Partial Payment", Color(0xFFF59E0B)),
+                    Triple("PENDING", "Awaiting Payment", Glass.Red),
+                ),
+                pay,
+            ) { pay = it }
         }
-        if (pay != "PENDING") {
-            val modeOptions = if (allModes) lists.paymentModes else
-                ranked(all.map { it.paymentMode }, lists.paymentModes, 3).let { if (mode.isNotBlank() && mode !in it) listOf(mode) + it else it }
-            ChoiceGroup("Payment mode", modeOptions, mode, { mode = it }) {
-                if (lists.paymentModes.size > modeOptions.size || allModes) Choice(if (allModes) "Less" else "More…", false, { allModes = !allModes })
+        AnimatedVisibility(pay == "PARTIAL") {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
+                GlassInput("Amount paid now · $code", partial, { partial = it }, Modifier.weight(1f), placeholder = "0", keyboard = KeyboardType.Decimal)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FieldLabel("Pending balance")
+                    Box(
+                        Modifier.fillMaxWidth().heightIn(min = 50.dp).clip(RoundedCornerShape(15.dp)).background(Glass.AmberBg).padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) { T("$code ${amt((live.balance ?: 0.0).coerceAtLeast(0.0))}", 15.sp, Glass.Amber, FontWeight.Bold) }
+                }
             }
         }
 
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 30.dp).clip(RoundedCornerShape(8.dp)).clickable { showMore = !showMore },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        // Payment mode: icon cards
+        AnimatedVisibility(pay != "PENDING") {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                FieldLabel("Payment mode")
+                val main = listOf("CASH", "BANK TRANSFER", "CDM DEPOSIT")
+                val rest = lists.paymentModes.filter { it !in main }
+                val keys = main + (if (allModes) rest else listOfNotNull(mode.takeIf { it.isNotBlank() && it !in main })) + MORE
+                ModeCards(keys.distinct().map { it to modeIcon(it, allModes) }, mode, { k -> if (k == MORE) allModes = !allModes else mode = k }) { modeLabel(it, allModes) }
+            }
+        }
+
+        // More details accordion
+        val shapeMd = RoundedCornerShape(20.dp)
+        Column(
+            Modifier.fillMaxWidth().softShadow(20.dp, 4.dp, 12.dp, 0.08f, 0.9f).clip(shapeMd).background(Color.White).border(1.dp, Glass.Edge, shapeMd)
+                .clickable { showMore = !showMore }.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            T("More details", 13.sp, Glass.Ink, FontWeight.SemiBold, Modifier.weight(1f))
-            T("Passport, travel date, notes", 11.sp, Glass.Muted)
-            Lc(R.drawable.lc_chevron_down, Glass.Muted, 16.dp, Modifier.rotate(if (showMore) 180f else 0f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(34.dp).clip(CircleShape).background(Glass.TileBg), contentAlignment = Alignment.Center) { Lc(R.drawable.lc_file_text, Glass.Ink, 17.dp) }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    T("More details", 14.sp, Glass.Ink, FontWeight.Bold)
+                    T("Passport, travel date, visa, notes", 11.sp, Glass.Muted)
+                }
+                Lc(R.drawable.lc_chevron_down, Glass.Muted, 18.dp, Modifier.rotate(if (showMore) 180f else 0f))
+            }
+            if (!showMore) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("Passport expiry", "Travel date", "PNR").forEach { StatusPill(it, Glass.Ink, Glass.TileBg, 11.sp) }
+            }
         }
         AnimatedVisibility(showMore) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -416,19 +517,21 @@ fun CashSheet(original: CashEntry?, state: AppState) {
         val agentOptions = ranked(allCash.map { it.agent } + bookings.map { it.agent }, lists.agents, 5)
             .let { if (agent.isNotBlank() && agent !in it) listOf(agent) + it else it }
         ChoiceGroup("Paid to agent", agentOptions, agent, { agent = it; addAgent = false }, display = ::nice) {
-            Choice("+ Add", addAgent, { addAgent = !addAgent; if (addAgent) agent = "" })
+            DashedChip(if (addAgent) "Cancel" else "+ Add") { addAgent = !addAgent; if (addAgent) agent = "" }
         }
         if (addAgent) GlassInput(null, agent, { agent = it }, placeholder = "Agent name", caps = KeyboardCapitalization.Characters)
 
         DateChoices("Payment date", date) { date = it }
 
-        val modeOptions = if (allModes) lists.paymentModes else
-            ranked(allCash.map { it.mode }, lists.paymentModes, 3).let { if (mode.isNotBlank() && mode !in it) listOf(mode) + it else it }
-        ChoiceGroup("Payment mode", modeOptions, mode, { mode = it }) {
-            if (lists.paymentModes.size > modeOptions.size || allModes) Choice(if (allModes) "Less" else "More…", false, { allModes = !allModes })
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            FieldLabel("Payment mode")
+            val main = listOf("CASH", "BANK TRANSFER", "CDM DEPOSIT")
+            val rest = lists.paymentModes.filter { it !in main }
+            val keys = main + (if (allModes) rest else listOfNotNull(mode.takeIf { it.isNotBlank() && it !in main })) + MORE
+            ModeCards(keys.distinct().map { it to modeIcon(it, allModes) }, mode, { k -> if (k == MORE) allModes = !allModes else mode = k }) { modeLabel(it, allModes) }
         }
 
-        GlassInput("Remarks · optional", remarks, { remarks = it }, placeholder = "Receipt no., note…", icon = R.drawable.lc_pencil_line,
+        GlassInput("Remarks · optional", remarks, { remarks = it }, placeholder = "Receipt no., note…", leading = R.drawable.lc_pencil_line,
             caps = KeyboardCapitalization.Sentences)
 
         if (existing) TextAction("Delete payment", Glass.Red) { confirmDelete = true }
