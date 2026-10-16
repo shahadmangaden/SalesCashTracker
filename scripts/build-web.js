@@ -13,12 +13,22 @@ fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 
 // 1. Bundle the browser bridge (IndexedDB storage + Excel in the browser)
-esbuild.buildSync({
+(async () => {
+await esbuild.build({
   entryPoints: [path.join(root, 'web', 'bridge.js')],
   bundle: true, minify: true, format: 'esm', splitting: true, platform: 'browser', target: ['es2020'],
   entryNames: '[name]', chunkNames: 'chunks/[name]-[hash]',
   define: { __APP_VERSION__: JSON.stringify(version), global: 'globalThis' },
   outdir: out,
+  // Test builds swap Firebase for a local stand-in (see test/mock-backend.js)
+  plugins: process.env.SYNC_MOCK ? [{
+    name: 'mock-sync',
+    setup(b) {
+      b.onResolve({ filter: /firebase-backend\.js$/ }, () => ({ path: path.join(root, 'test', 'mock-backend.js') }));
+      b.onResolve({ filter: /firebase-config\.js$/ }, () => ({ path: 'mock-config', namespace: 'mock' }));
+      b.onLoad({ filter: /.*/, namespace: 'mock' }, () => ({ contents: 'export default { mock: true };', loader: 'js' }));
+    },
+  }] : [],
   logLevel: 'warning',
 });
 
@@ -28,6 +38,7 @@ for (const f of ['app.js', 'styles.css']) fs.copyFileSync(path.join(root, 'src',
 // 3. index.html: load the bridge first, add PWA manifest + service worker
 let html = fs.readFileSync(path.join(root, 'src', 'index.html'), 'utf8');
 html = html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>\s*/, '');
+html = html.replace(/\s*<script src="\.\.\/app-dist\/desktop-sync\.js"><\/script>/, '');
 html = html.replace('</title>', `</title>
   <meta name="theme-color" content="#13294b">
   <meta name="description" content="Sales & cash paid tracker for travel sales">
@@ -86,3 +97,4 @@ self.addEventListener('fetch', e => {
 fs.writeFileSync(path.join(out, '.nojekyll'), '');
 console.log('Web app built into web-dist/ (version ' + version + ')');
 for (const f of fs.readdirSync(out).filter(f => f !== 'chunks')) console.log('  ' + f + '  ' + (fs.statSync(path.join(out, f)).size / 1024).toFixed(0) + ' KB');
+})().catch(e => { console.error(e); process.exit(1); });

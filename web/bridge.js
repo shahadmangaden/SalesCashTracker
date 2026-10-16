@@ -72,7 +72,7 @@ async function migrate() {
 }
 const ready = migrate();
 
-window.api = {
+const base = {
   platform: 'web',
   async load() { await ready; return (await get('data')) || null; },
   async save(data) {
@@ -121,3 +121,19 @@ window.api = {
   },
   async confirm(message, detail) { return window.confirm(message + (detail ? '\n\n' + detail : '')); },
 };
+
+window.api = base;
+
+// Online sync: only loaded when a Firebase config is present
+import firebaseConfig from './firebase-config.js';
+window.apiReady = (async () => {
+  const { createSync } = await import('./sync-core.js');
+  if (!firebaseConfig) return createSync(base, null);
+  try {
+    const { createFirebaseBackend } = await import('./firebase-backend.js');
+    return createSync(base, createFirebaseBackend(firebaseConfig));
+  } catch (e) {
+    console.error('Online sync failed to start', e);
+    return createSync(base, null);
+  }
+})();

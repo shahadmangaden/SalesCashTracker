@@ -2,7 +2,7 @@
 'use strict';
 
 // ---------- Storage bridge (Electron preload, or browser fallback for preview) ----------
-const bridge = window.api || (() => {
+let bridge = window.api || (() => {
   const KEY = 'sct-data';
   return {
     load: async () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch (_) { return null; } },
@@ -635,6 +635,7 @@ const LIST_DEFS = [
 async function renderSettings(v) {
   const info = await bridge.info();
   v.innerHTML = `
+    <div class="card" style="margin-bottom:14px" id="syncCard"></div>
     <div class="card" style="margin-bottom:14px"><h2>Data</h2>
       <p class="muted" style="margin-top:0">${IS_WEB
         ? 'Everything is saved automatically in this browser on this device, with a snapshot kept each day (last 30 days). Clearing browser data deletes it, so save a backup file regularly. To move to another device, save a backup here and restore it there.'
@@ -665,6 +666,7 @@ async function renderSettings(v) {
         <div class="add"><input type="text" placeholder="Add new type…"><button class="btn small">Add</button></div></div>
     </div>`;
 
+  renderSyncCard();
   $('#sImport').onclick = doImport;
   $('#sExport').onclick = doExport;
   $('#sBackup').onclick = async () => { const p = await bridge.saveBackup(data); if (p) toast('Backup saved'); };
@@ -758,6 +760,106 @@ async function doRestoreSnapshot() {
   };
 }
 
+// ---------- Online sync ----------
+const SYNC_TEXT = {
+  off: 'Data saves automatically',
+  'signed-out': 'Not syncing · saved on this device',
+  syncing: '⟳ Syncing…',
+  synced: '☁ Synced',
+  error: '⚠ Sync problem',
+};
+let syncInfo = { status: 'off', email: '', error: '' };
+function setupSync() {
+  const s = bridge.sync;
+  if (!s || !s.available) return;
+  s.onRemoteChange(d => {
+    data = normalize(d);
+    if (ui.view !== 'settings') render(); else { renderMonthFilter(); updateExpiryBadge(); }
+  });
+  s.onStatus(info => {
+    syncInfo = info;
+    const el = $('#syncState');
+    if (el) {
+      el.hidden = false;
+      el.className = 'sync-state ' + info.status;
+      el.onclick = () => go('settings');
+      let t = SYNC_TEXT[info.status] || '';
+      if (info.status === 'synced' && !navigator.onLine) t = '☁ Offline · will sync';
+      el.textContent = t;
+      el.title = info.error || info.email || '';
+    }
+    if (ui.view === 'settings' && $('#syncCard')) renderSyncCard();
+  });
+  window.addEventListener('online', () => s.flush());
+}
+function friendlyError(e) {
+  const code = (e && (e.code || e.message)) || String(e);
+  const map = {
+    'auth/invalid-credential': 'Wrong email or password.',
+    'auth/wrong-password': 'Wrong email or password.',
+    'auth/user-not-found': 'No account with that email. Use “Create account” first.',
+    'auth/invalid-email': 'That email address doesn\'t look right.',
+    'auth/email-already-in-use': 'An account with this email already exists. Use “Sign in”.',
+    'auth/weak-password': 'Password must be at least 6 characters.',
+    'auth/missing-password': 'Enter a password.',
+    'auth/network-request-failed': 'No internet connection. Try again when online.',
+    'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
+    'auth/operation-not-allowed': 'Email/Password sign-in is not switched on in Firebase (Authentication → Sign-in method).',
+    'permission-denied': 'Firebase refused access. Check the Firestore rules were published.',
+  };
+  for (const k of Object.keys(map)) if (code.includes(k)) return map[k];
+  return code.replace(/^Firebase:\s*/, '');
+}
+function renderSyncCard() {
+  const card = $('#syncCard');
+  if (!card) return;
+  const s = bridge.sync;
+  if (!s || !s.available) {
+    card.innerHTML = `<h2>Online sync</h2><p class="muted" style="margin:0">Online sync isn't set up in this version.</p>`;
+    return;
+  }
+  const st = syncInfo.status;
+  if (st === 'signed-out') {
+    card.innerHTML = `<h2>Online sync <span class="hint">share records between your phone and PC</span></h2>
+      <p class="muted" style="margin-top:0">Sign in with the same email on every device. Records already on this device are kept and added to your account.</p>
+      <form id="syncForm" class="form-grid" style="grid-template-columns:1fr 1fr auto;align-items:end">
+        <label class="field"><span>Email</span><input type="email" name="email" autocomplete="username" required></label>
+        <label class="field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required minlength="6"></label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn primary" type="submit" data-act="in">Sign in</button><button class="btn" type="button" data-act="up">Create account</button></div>
+      </form>
+      <p style="margin:8px 0 0;font-size:12px"><a href="#" id="syncForgot">Forgot password?</a> <span id="syncMsg" class="due" style="margin-left:8px"></span></p>`;
+    const f = $('#syncForm');
+    const msg = t => { $('#syncMsg').textContent = t || ''; };
+    const run = async (fn, label) => {
+      const email = f.email.value.trim(), pw = f.password.value;
+      if (!email || !pw) { msg('Enter your email and password.'); return; }
+      $$('button', f).forEach(b => b.disabled = true); msg('');
+      try { await fn(email, pw); toast(label); }
+      catch (e) { msg(friendlyError(e)); $$('button', f).forEach(b => b.disabled = false); }
+    };
+    f.onsubmit = e => { e.preventDefault(); run(s.signIn, 'Signed in — syncing'); };
+    $('[data-act=up]', f).onclick = () => run(s.signUp, 'Account created — syncing');
+    $('#syncForgot').onclick = async e => {
+      e.preventDefault();
+      const email = f.email.value.trim();
+      if (!email) { msg('Type your email first, then click “Forgot password?”.'); return; }
+      try { await s.resetPassword(email); msg(''); toast('Password reset email sent'); } catch (err) { msg(friendlyError(err)); }
+    };
+    return;
+  }
+  const label = { syncing: 'Syncing…', synced: navigator.onLine ? 'All records synced' : 'Offline — changes will sync when you\'re back online', error: 'Sync problem' }[st] || st;
+  card.innerHTML = `<h2>Online sync <span class="pill ${st === 'synced' ? 'PAID' : st === 'error' ? 'PENDING' : 'SUBMITTED'}">${esc(label)}</span></h2>
+    <p style="margin-top:0">Signed in as <b>${esc(syncInfo.email)}</b>. New and edited records go to your account automatically and appear on your other devices within seconds.</p>
+    ${syncInfo.error ? `<p class="due" style="font-size:12.5px">${esc(friendlyError(syncInfo.error))}</p>` : ''}
+    <div class="data-actions"><button class="btn" id="syncNow">Sync now</button><button class="btn" id="syncOut">Sign out</button></div>`;
+  $('#syncNow').onclick = () => { s.flush(); toast('Syncing…'); };
+  $('#syncOut').onclick = async () => {
+    if (await confirmBox('Sign out of online sync?', 'Records stay on this device, but new changes will no longer sync until you sign in again.', 'Sign out')) {
+      await s.signOut(); toast('Signed out');
+    }
+  };
+}
+
 // ---------- Modal helpers ----------
 function openModal(html, narrow) {
   const m = $('#modal');
@@ -795,9 +897,12 @@ function normalize(d) {
 }
 
 async function boot() {
+  // Online sync (if set up) wraps the storage bridge; wait for it before loading
+  if (window.apiReady) { try { bridge = (await window.apiReady) || bridge; } catch (e) { console.error('Sync unavailable', e); } }
   data = normalize(await bridge.load());
   const info = await bridge.info();
   $('#sideFoot').innerHTML = `${IS_WEB ? 'Web' : 'Desktop'} v${esc(info.version)} · Ctrl+N new sale<br>Data saves automatically`;
+  setupSync();
   $$('#nav button').forEach(b => b.onclick = () => go(b.dataset.view));
   $('#monthFilter').onchange = e => { ui.month = e.target.value; render(); };
   $('#search').oninput = e => { ui.search = e.target.value; render(); $('#search').focus(); };
