@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -49,7 +50,7 @@ import java.util.Locale
 @Composable
 fun GlassSearch(value: String, onChange: (String) -> Unit, placeholder: String) {
     Row(
-        Modifier.fillMaxWidth().height(44.dp).glass(100.dp, shadow = false).padding(horizontal = 14.dp),
+        Modifier.fillMaxWidth().heightIn(min = 44.dp).glass(100.dp, shadow = false).padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -194,7 +195,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.productsReport(pb: Li
             GlassCard(padding = PaddingValues(15.dp)) {
                 if (groups.isEmpty()) T("No sales in this period", 13.sp, Glass.Muted)
                 groups.forEachIndexed { i, (name, sales, _) ->
-                    Row(Modifier.fillMaxWidth().height(32.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth().heightIn(min = 32.dp).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(Modifier.size(9.dp).clip(RoundedCornerShape(3.dp)).background(DonutColors[i % DonutColors.size]))
                         T(sentence(name), 12.sp, Glass.Ink, FontWeight.Medium, Modifier.weight(1f))
                         T(amt(sales), 12.sp, Glass.Ink, FontWeight.Bold)
@@ -299,7 +300,7 @@ private fun VisaCard(b: Booking, d: Long, docTypes: List<DocType>, ctx: android.
 @Composable
 private fun SettingRow(@DrawableRes icon: Int, title: String, sub: String, divider: Boolean, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Row(Modifier.fillMaxWidth().height(61.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 61.dp).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             IconTile(icon, Glass.BlueBg, Glass.Blue, 34.dp, 11.dp, 18.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 T(title, 14.sp, Glass.Ink, FontWeight.SemiBold)

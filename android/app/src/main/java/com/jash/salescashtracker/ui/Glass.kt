@@ -344,8 +344,8 @@ fun GlassInput(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (label != null) FieldLabel(label)
         Row(
-            Modifier.fillMaxWidth().height(46.dp).clip(shape).background(Color.White.copy(alpha = 0.86f))
-                .border(1.dp, if (focused) Glass.Blue.copy(alpha = 0.55f) else Glass.Edge, shape).padding(horizontal = 14.dp),
+            Modifier.fillMaxWidth().heightIn(min = 46.dp).clip(shape).background(Color.White.copy(alpha = 0.86f))
+                .border(1.dp, if (focused) Glass.Blue.copy(alpha = 0.55f) else Glass.Edge, shape).padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -372,7 +372,7 @@ fun GlassInput(
 @Composable
 fun MetricTile(@DrawableRes icon: Int, label: String, value: String, modifier: Modifier = Modifier, valueColor: Color = Glass.Ink, onClick: (() -> Unit)? = null) {
     Row(
-        modifier.height(58.dp).glass(19.dp, shadow = false).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(12.dp),
+        modifier.heightIn(min = 58.dp).glass(19.dp, shadow = false).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -389,12 +389,12 @@ fun MetricTile(@DrawableRes icon: Int, label: String, value: String, modifier: M
 fun Segments(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
     val shape = RoundedCornerShape(100.dp)
     Row(
-        Modifier.fillMaxWidth().height(45.dp).clip(shape).background(Color.White.copy(alpha = 0.5f)).border(1.dp, Glass.Edge, shape).padding(4.dp),
+        Modifier.fillMaxWidth().heightIn(min = 45.dp).clip(shape).background(Color.White.copy(alpha = 0.5f)).border(1.dp, Glass.Edge, shape).padding(4.dp),
     ) {
         options.forEach { (key, label) ->
             val on = key == selected
             Box(
-                Modifier.weight(1f).fillMaxHeight()
+                Modifier.weight(1f).heightIn(min = 37.dp)
                     .then(if (on) Modifier.shadow(6.dp, shape, ambientColor = Glass.Shadow.copy(alpha = 0.08f), spotColor = Glass.Shadow.copy(alpha = 0.1f)) else Modifier)
                     .clip(shape).background(if (on) Color.White else Color.Transparent).clickable { onSelect(key) },
                 contentAlignment = Alignment.Center,
@@ -407,11 +407,11 @@ fun Segments(options: List<Pair<String, String>>, selected: String, onSelect: (S
 @Composable
 fun BarChart(values: List<Pair<String, Double>>, modifier: Modifier = Modifier) {
     val max = (values.maxOfOrNull { it.second } ?: 0.0).coerceAtLeast(1.0)
-    Row(modifier.fillMaxWidth().height(92.dp).padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.Bottom) {
+    Row(modifier.fillMaxWidth().height(96.dp).padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.Bottom) {
         values.forEachIndexed { i, (label, v) ->
             val on = i == values.lastIndex
             Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {
-                val barMax = 62f
+                val barMax = 60f
                 val h = (barMax * (v / max).toFloat()).coerceAtLeast(6f)
                 Box(Modifier.fillMaxWidth().height(h.dp).clip(RoundedCornerShape(6.dp)).background(if (on) Glass.Blue else Color(0xA69BB9F4)))
                 Spacer(Modifier.height(6.dp))

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -256,7 +257,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
         live.profit?.let { p ->
             val good = p >= 0
             Row(
-                Modifier.fillMaxWidth().height(37.dp).clip(RoundedCornerShape(12.dp)).background(if (good) Glass.GreenBg else Glass.RedBg).padding(horizontal = 13.dp),
+                Modifier.fillMaxWidth().heightIn(min = 37.dp).clip(RoundedCornerShape(12.dp)).background(if (good) Glass.GreenBg else Glass.RedBg).padding(horizontal = 13.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 T(if (good) "Your profit" else "Loss", 12.sp, if (good) Glass.Green else Glass.Red, FontWeight.SemiBold, Modifier.weight(1f))
@@ -269,7 +270,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
         if (pay == "PARTIAL") {
             GlassInput(null, partial, { partial = it }, placeholder = "Amount received", keyboard = KeyboardType.Decimal)
             Row(
-                Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.86f)).padding(horizontal = 12.dp),
+                Modifier.fillMaxWidth().heightIn(min = 34.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.86f)).padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 T("Received · ${cur(parseNum(partial) ?: 0.0, code)}", 12.sp, Glass.Muted, modifier = Modifier.weight(1f))
@@ -285,7 +286,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
         }
 
         Row(
-            Modifier.fillMaxWidth().height(30.dp).clip(RoundedCornerShape(8.dp)).clickable { showMore = !showMore },
+            Modifier.fillMaxWidth().heightIn(min = 30.dp).clip(RoundedCornerShape(8.dp)).clickable { showMore = !showMore },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
