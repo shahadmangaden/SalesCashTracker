@@ -53,7 +53,7 @@ fun HomeScreen(state: AppState) {
     // Balance still due on this period's sales after agents' cash payments are applied
     val dueMap = remember(bookings, cash) { dueAfterCash(bookings, cash) }
     val balanceDue = pb.sumOf { dueMap[it.id] ?: (it.balance ?: 0.0) }
-    var homeTab by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("unpaid") }
+    var homeTab by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
     val hour = LocalTime.now().hour
     val greet = when { hour < 12 -> "Good morning"; hour < 17 -> "Good afternoon"; else -> "Good evening" }
     val firstName = nice(settings.user.split(" ").firstOrNull() ?: "")
@@ -184,14 +184,16 @@ fun HomeScreen(state: AppState) {
             val paidSales = pb.filter { b -> b.statusWith(dueMap[b.id] ?: (b.balance ?: 0.0)) == "PAID" }
             val unpaidSales = pb.filter { b -> (dueMap[b.id] ?: (b.balance ?: 0.0)) > 0.5 }
             data class Line(val sort: String, val date: String, @DrawableRes val icon: Int, val title: String, val sub: String, val amount: String, val color: Color, val open: () -> Unit)
-            val lines = when (homeTab) {
+            // Open on Unpaid when something is owed, otherwise on Paid
+            val tab = homeTab.ifBlank { if (unpaidSales.isNotEmpty()) "unpaid" else if (paidSales.isNotEmpty()) "paid" else "cash" }
+            val lines = when (tab) {
                 "paid" -> paidSales.map { b -> Line(b.date + b.createdAt, b.date, productIcon(b.category), nice(b.customer), listOf(sentence(b.category), nice(b.agent)).filter { it.isNotBlank() }.joinToString(" · "), cur(b.sellingPrice, code), Glass.Ink) { state.push(Route.EditSale(b)) } }
                 "cash" -> pc.map { c -> Line(c.date + c.createdAt, c.date, R.drawable.lc_wallet, nice(c.agent).ifBlank { "No agent" }, sentence(c.mode), "+" + cur(c.amount, code), Glass.Green) { state.push(Route.EditCash(c)) } }
                 else -> unpaidSales.map { b -> Line(b.date + b.createdAt, b.date, productIcon(b.category), nice(b.customer), "Due ${cur(dueMap[b.id] ?: 0.0, code)} · ${nice(b.agent)}", cur(b.sellingPrice, code), Glass.Red) { state.push(Route.EditSale(b)) } }
             }.sortedByDescending { it.sort }.take(8)
             FolderTabs(
                 listOf("paid" to "Paid · ${paidSales.size}", "unpaid" to "Unpaid · ${unpaidSales.size}", "cash" to "Cash · ${pc.size}"),
-                homeTab, { homeTab = it },
+                tab, { homeTab = it },
             ) {
                 if (lines.isEmpty()) T(if (bookings.isEmpty()) "Tap + to add your first sale or cash payment." else "Nothing here for this month.", 12.sp, Glass.Muted, maxLines = 2, modifier = Modifier.padding(vertical = 8.dp))
                 lines.forEachIndexed { i, l ->

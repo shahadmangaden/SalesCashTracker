@@ -132,7 +132,8 @@ fun nice(s: String): String = s.trim().lowercase(Locale.ENGLISH).split(Regex("\\
 
 /** FLIGHT TICKET -> Flight ticket */
 fun sentence(s: String): String = s.trim().lowercase(Locale.ENGLISH).replaceFirstChar { it.titlecase(Locale.ENGLISH) }
-    .replace("ksa", "KSA").replace("uae", "UAE")
+    .replace(Regex("\\bksa\\b", RegexOption.IGNORE_CASE), "KSA").replace(Regex("\\buae\\b", RegexOption.IGNORE_CASE), "UAE")
+    .replace("multipple", "multiple", ignoreCase = true)
 
 fun initials(name: String): String = name.trim().split(Regex("[\\s/]+")).filter { it.isNotBlank() && it[0].isLetterOrDigit() }
     .take(2).joinToString("") { it.take(1).uppercase() }.ifBlank { "?" }
@@ -488,13 +489,13 @@ fun SheetFrame(
             .border(1.dp, Glass.Edge, shape)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
             .imePadding()
-            .padding(start = 22.dp, end = 22.dp, top = 10.dp),
+            .padding(top = 10.dp),
     ) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Box(Modifier.width(36.dp).height(4.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFA4B1C7)))
         }
         Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp), verticalAlignment = Alignment.CenterVertically) {
             T(title, 26.sp, Glass.Ink, FontWeight.Bold, Modifier.weight(1f))
             Box(Modifier.size(30.dp).clip(CircleShape).background(Glass.CloseBg).clickable(onClick = onClose), contentAlignment = Alignment.Center) {
                 Lc(R.drawable.lc_x, Glass.Ink, 16.dp, description = "Close")
@@ -503,14 +504,16 @@ fun SheetFrame(
         Spacer(Modifier.height(spacing))
         Column(
             Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
-                .then(if (footer == null) Modifier.navigationBarsPadding() else Modifier).padding(bottom = if (footer == null) 22.dp else 12.dp),
+                .then(if (footer == null) Modifier.navigationBarsPadding() else Modifier)
+                .padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = if (footer == null) 22.dp else 16.dp),
             verticalArrangement = Arrangement.spacedBy(spacing),
             content = content,
         )
         if (footer != null) {
             // Pinned action bar: the Save button is always visible, the form scrolls behind it
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Glass.Divider))
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().padding(top = 6.dp, bottom = 14.dp),
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 content = footer,
             )
@@ -551,13 +554,13 @@ fun DateStrip(selected: String, onSelect: (String) -> Unit, onPickOlder: () -> U
     val scroll = rememberScrollState()
     androidx.compose.runtime.LaunchedEffect(Unit) { scroll.scrollTo(scroll.maxValue) }
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(scroll).padding(vertical = 8.dp, horizontal = 4.dp),
+        Modifier.fillMaxWidth().horizontalScroll(scroll).padding(start = 6.dp, end = 14.dp, top = 12.dp, bottom = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val pill = RoundedCornerShape(999.dp)
         Box(
-            Modifier.size(width = 52.dp, height = 78.dp).softShadow(26.dp, 4.dp, 10.dp, 0.12f).clip(pill)
+            Modifier.size(width = 52.dp, height = 78.dp).softShadow(26.dp, 3.dp, 10.dp, 0.08f, 0.45f).clip(pill)
                 .background(Color.White.copy(alpha = 0.9f)).border(1.dp, Glass.Edge, pill).clickable(onClick = onPickOlder),
             contentAlignment = Alignment.Center,
         ) { Lc(R.drawable.lc_calendar, Glass.Blue, 22.dp, description = "Pick an older date") }
@@ -568,7 +571,7 @@ fun DateStrip(selected: String, onSelect: (String) -> Unit, onPickOlder: () -> U
             )
             Column(
                 Modifier.size(width = 52.dp, height = 78.dp).graphicsLayer { scaleX = scale; scaleY = scale }
-                    .softShadow(26.dp, if (on) 6.dp else 4.dp, 12.dp, if (on) 0.22f else 0.10f)
+                    .softShadow(26.dp, if (on) 5.dp else 3.dp, 10.dp, if (on) 0.22f else 0.08f, 0.45f)
                     .clip(pill)
                     .background(if (on) Raised else Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.75f))))
                     .border(1.dp, if (on) Color.White.copy(alpha = 0.5f) else Glass.Edge, pill)
