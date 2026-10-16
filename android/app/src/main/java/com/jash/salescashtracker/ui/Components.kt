@@ -213,6 +213,17 @@ fun SearchField(value: String, onChange: (String) -> Unit, placeholder: String, 
     )
 }
 
+/** Field colours matching the design's inputs: white 86% fill, white edge, blue when focused. */
+@Composable
+fun glassFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedContainerColor = Color.White.copy(alpha = 0.92f),
+    unfocusedContainerColor = Color.White.copy(alpha = 0.86f),
+    focusedBorderColor = AppColors.Blue,
+    unfocusedBorderColor = Color.White,
+    focusedLabelColor = AppColors.Blue,
+    unfocusedLabelColor = AppColors.Secondary,
+)
+
 @Composable
 fun FormField(
     label: String,
@@ -230,7 +241,8 @@ fun FormField(
         label = { Text(if (required) "$label *" else label) },
         modifier = modifier.fillMaxWidth(),
         singleLine = singleLine,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(15.dp),
+        colors = glassFieldColors(),
         keyboardOptions = KeyboardOptions(
             keyboardType = keyboard,
             capitalization = if (caps && keyboard == KeyboardType.Text) KeyboardCapitalization.Characters else KeyboardCapitalization.None,
@@ -272,7 +284,8 @@ fun DropdownField(
             readOnly = !editable,
             label = { Text(label) },
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(15.dp),
+            colors = glassFieldColors(),
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
             modifier = Modifier
@@ -308,11 +321,12 @@ fun DateField(
             label = { Text(label) },
             enabled = false,
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(15.dp),
             trailingIcon = { Icon(Icons.Filled.DateRange, null) },
             colors = OutlinedTextFieldDefaults.colors(
+                disabledContainerColor = Color.White.copy(alpha = 0.86f),
                 disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledBorderColor = Color.White,
                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 disabledTrailingIconColor = MaterialTheme.colorScheme.primary,
             ),

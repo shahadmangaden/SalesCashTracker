@@ -1,26 +1,25 @@
 package com.jash.salescashtracker.ui
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,32 +27,89 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jash.salescashtracker.R
 import com.jash.salescashtracker.data.Booking
 import com.jash.salescashtracker.data.CashEntry
 import com.jash.salescashtracker.data.Repository
 import com.jash.salescashtracker.data.Totals
+import com.jash.salescashtracker.ui.theme.Inter
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
+/** Pill search field (44dp, glass). */
 @Composable
 fun GlassSearch(value: String, onChange: (String) -> Unit, placeholder: String) {
-    TextField(
-        value = value,
-        onValueChange = onChange,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).glass(RoundedCornerShape(22.dp), strong = true, elevation = 4.dp),
-        placeholder = { Text(placeholder, color = Glass.Muted) },
-        leadingIcon = { Icon(Icons.Filled.Search, null, tint = Glass.Muted) },
-        trailingIcon = { if (value.isNotEmpty()) Icon(Icons.Filled.Clear, "Clear", tint = Glass.Muted, modifier = Modifier.clickable { onChange("") }) },
-        singleLine = true,
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
-            focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
-        ),
-    )
+    Row(
+        Modifier.fillMaxWidth().height(44.dp).glass(100.dp, shadow = false).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Lc(R.drawable.lc_search, Glass.Muted, 18.dp)
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            if (value.isEmpty()) T(placeholder, 14.sp, Glass.Muted)
+            BasicTextField(
+                value, onChange, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                textStyle = TextStyle(fontFamily = Inter, fontSize = 14.sp, color = Glass.Ink),
+                cursorBrush = SolidColor(Glass.Blue),
+            )
+        }
+        if (value.isNotEmpty()) Lc(R.drawable.lc_x, Glass.Muted, 16.dp, Modifier.clip(CircleShape).clickable { onChange("") }, "Clear")
+    }
+}
+
+/** Heading action that opens the month picker. */
+@Composable
+fun PeriodMenuButton(state: AppState, @DrawableRes icon: Int) {
+    val bookings by Repository.bookings.collectAsStateWithLifecycle()
+    val cash by Repository.cash.collectAsStateWithLifecycle()
+    var open by remember { mutableStateOf(false) }
+    val months = remember(bookings, cash) {
+        (bookings.map { it.date.take(7) } + cash.map { it.date.take(7) } + LocalDate.now().toString().take(7))
+            .filter { it.length == 7 }.distinct().sortedDescending()
+    }
+    Box {
+        HeadingAction(icon, { open = true }, "Choose month")
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text("All time", fontWeight = if (state.month == "all") FontWeight.Bold else null) }, onClick = { state.month = "all"; open = false })
+            months.forEach { m ->
+                val label = runCatching { YearMonth.parse(m).format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)) }.getOrDefault(m)
+                DropdownMenuItem(text = { Text(label, fontWeight = if (state.month == m) FontWeight.Bold else null) }, onClick = { state.month = m; open = false })
+            }
+        }
+    }
+}
+
+private val dayShort = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+private val dayLongYear = DateTimeFormatter.ofPattern("EEEE · d MMM yyyy", Locale.ENGLISH)
+private val dayLong = DateTimeFormatter.ofPattern("EEEE · d MMM", Locale.ENGLISH)
+
+/** "TODAY · 16 OCT", "YESTERDAY · 15 OCT", "MONDAY · 13 OCT" */
+fun dayLabel(iso: String): String = runCatching {
+    val d = LocalDate.parse(iso.take(10))
+    val today = LocalDate.now()
+    when {
+        d == today -> "Today · " + d.format(dayShort)
+        d == today.minusDays(1) -> "Yesterday · " + d.format(dayShort)
+        d.year == today.year -> d.format(dayLong)
+        else -> d.format(dayLongYear)
+    }.uppercase(Locale.ENGLISH)
+}.getOrDefault(iso)
+
+@Composable
+private fun DayHeader(day: String, total: String) {
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        T(dayLabel(day), 12.sp, Glass.Muted, FontWeight.SemiBold, Modifier.weight(1f))
+        T(total, 11.sp, Glass.Muted)
+    }
 }
 
 // ---------- Sales ----------
@@ -61,6 +117,7 @@ fun GlassSearch(value: String, onChange: (String) -> Unit, placeholder: String) 
 @Composable
 fun SalesScreen(state: AppState) {
     val bookings by Repository.bookings.collectAsStateWithLifecycle()
+    val code = LocalCurrency.current
     var search by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("") }
     val q = search.trim().lowercase()
@@ -68,71 +125,61 @@ fun SalesScreen(state: AppState) {
         .filter { state.inPeriod(it.date) }
         .filter { state.agentFilter.isBlank() || it.agent == state.agentFilter }
         .filter { q.isBlank() || listOf(it.customer, it.agent, it.pnr, it.ref, it.detail, it.contact, it.sector, it.category).any { f -> f.lowercase().contains(q) } }
-        .filter { when (status) { "" -> true; "DUE" -> (it.balance ?: 0.0) > 0; else -> it.paymentStatus == status } }
+        .filter { when (status) { "" -> true; "DUE" -> (it.balance ?: 0.0) > 0.5; else -> it.paymentStatus == status } }
         .sortedWith(compareByDescending<Booking> { it.date }.thenByDescending { it.createdAt })
     val t = Totals.of(rows, emptyList())
+    val groups = rows.groupBy { it.date }
 
-    LazyColumn {
-        item { PageHeader("Sales", subtitle = "${t.count} bookings · ${money(t.sales)}", actions = { PeriodPill(state) }) }
-        item { GlassSearch(search, { search = it }, "Search name, agent, PNR…") }
+    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.agentFilter.isNotBlank()) ChoiceChip("✕  ${state.agentFilter}", true, { state.agentFilter = "" }, color = Color(0xFF5856D6))
-                listOf("" to "All", "DUE" to "Balance due", "PAID" to "Paid", "PARTIAL" to "Partial", "PENDING" to "Pending").forEach { (k, l) ->
-                    ChoiceChip(l, status == k, { status = k })
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    PageHeading("Sales", "${state.periodLong} · ${t.count} ${if (t.count == 1) "sale" else "sales"} · ${cur(t.sales, code)}")
                 }
+                PeriodMenuButton(state, R.drawable.lc_sliders_horizontal)
             }
         }
+        item { Box(Modifier.padding(top = 6.dp)) { GlassSearch(search, { search = it }, "Search customer, agent or product") } }
         item {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GlassStat("Profit", money(t.profit), Modifier.weight(1f), valueColor = Color(0xFF1A7F37))
-                GlassStat("Balance due", money(t.balance), Modifier.weight(1f), valueColor = if (t.balance > 0) Color(0xFFB25E00) else Glass.Ink)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (state.agentFilter.isNotBlank()) Choice("✕  ${nice(state.agentFilter)}", true, { state.agentFilter = "" }, large = true)
+                listOf("" to "All", "DUE" to "Balance due", "PAID" to "Paid", "PARTIAL" to "Partial", "PENDING" to "Pending").forEach { (k, l) ->
+                    Choice(l, status == k, { status = k }, large = true)
+                }
             }
         }
         if (rows.isEmpty()) item {
-            GlassCard(Modifier.padding(16.dp)) {
-                Text("No sales here", color = Glass.Ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Text(if (bookings.isEmpty()) "Tap + to add your first sale." else "Try another month, search or filter.", color = Glass.Muted)
+            GlassCard(spacing = 4.dp) {
+                T("No sales here", 15.sp, Glass.Ink, FontWeight.Bold)
+                T(if (bookings.isEmpty()) "Tap + to add your first sale." else "Try another month, search or filter.", 12.sp, Glass.Muted, maxLines = 2)
             }
         }
-        rows.groupBy { it.date }.forEach { (day, list) ->
-            item(key = "s$day") {
-                Text(
-                    dayHeader(day) + "   " + money(list.sumOf { it.sellingPrice ?: 0.0 }),
-                    color = Glass.Muted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 24.dp, top = 14.dp, bottom = 6.dp),
-                )
-                GlassCard(Modifier.padding(horizontal = 16.dp), padding = 4.dp) {
-                    list.forEachIndexed { i, b ->
-                        if (i > 0) RowDivider(16)
-                        SaleRow(b) { state.push(Route.EditSale(b)) }
-                    }
-                }
-            }
+        groups.forEach { (day, list) ->
+            item(key = "h$day") { DayHeader(day, cur(list.sumOf { it.sellingPrice ?: 0.0 }, code)) }
+            items(list, key = { it.id }) { b -> SaleCard(b, code) { state.push(Route.EditSale(b)) } }
         }
         item { TabBarSpacer() }
     }
 }
 
 @Composable
-private fun SaleRow(b: Booking, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(b.customer.ifBlank { "—" }, color = Glass.Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(listOf(b.category, b.detail, b.agent).filter { it.isNotBlank() }.joinToString(" · "), color = Glass.Muted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (b.paymentStatus.isNotBlank() || b.pnr.isNotBlank()) {
-                Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (b.paymentStatus.isNotBlank()) Pill(b.paymentStatus)
-                    if (b.pnr.isNotBlank()) Pill(b.pnr, PillKind.Neutral)
-                }
+private fun SaleCard(b: Booking, code: String, onClick: () -> Unit) {
+    GlassCard(padding = PaddingValues(14.dp), spacing = 10.dp, onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            IconTile(productIcon(b.category))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                T(nice(b.customer).ifBlank { "—" }, 14.sp, Glass.Ink, FontWeight.Bold)
+                T(listOf(sentence(b.category), b.detail.let { if (it.isBlank()) b.sector else it }.let { nice(it) })
+                    .filter { it.isNotBlank() }.joinToString(" · "), 11.sp, Glass.Muted)
+            }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                T(cur(b.sellingPrice, code), 14.sp, Glass.Ink, FontWeight.Bold)
+                b.profit?.let { p -> T("Profit ${amt(p)}", 10.sp, if (p >= 0) Glass.Green else Glass.Red) }
             }
         }
-        Spacer(Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Text(money(b.sellingPrice), color = Glass.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            b.profit?.let { p -> Text((if (p >= 0) "+" else "") + money(p), color = if (p >= 0) Color(0xFF1A7F37) else Color(0xFFC62828), fontSize = 13.sp) }
-            val bal = b.balance ?: 0.0
-            if (bal > 0) Text("due ${money(bal)}", color = Color(0xFFC62828), fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            T(nice(b.agent).ifBlank { "No agent" }, 11.sp, Glass.Muted, modifier = Modifier.weight(1f))
+            PaymentPill(b.paymentStatus, b.balance ?: 0.0)
         }
     }
 }
@@ -142,52 +189,59 @@ private fun SaleRow(b: Booking, onClick: () -> Unit) {
 @Composable
 fun CashScreen(state: AppState) {
     val cash by Repository.cash.collectAsStateWithLifecycle()
+    val code = LocalCurrency.current
     var search by remember { mutableStateOf("") }
     val q = search.trim().lowercase()
-    val rows = cash.filter { state.inPeriod(it.date) }
+    val period = cash.filter { state.inPeriod(it.date) }
+    val rows = period
         .filter { q.isBlank() || listOf(it.agent, it.mode, it.remarks).any { f -> f.lowercase().contains(q) } }
         .sortedWith(compareByDescending<CashEntry> { it.date }.thenByDescending { it.createdAt })
-    val total = rows.sumOf { it.amount }
-    val byAgent = rows.groupBy { it.agent.ifBlank { "(no agent)" } }.mapValues { e -> e.value.sumOf { it.amount } }.entries.sortedByDescending { it.value }
+    val total = period.sumOf { it.amount }
+    val agents = period.map { it.agent }.filter { it.isNotBlank() }.distinct().size
+    val monthWord = if (state.month == "all") "all time" else runCatching {
+        YearMonth.parse(state.month).format(DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH))
+    }.getOrDefault(state.month)
 
-    LazyColumn {
-        item { PageHeader("Cash Paid", subtitle = "${rows.size} entries", actions = { PeriodPill(state) }) }
+    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            GlassCard(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), padding = 18.dp) {
-                Text("Total received", color = Glass.Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text(money(total), color = Color(0xFF1A7F37), fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                if (byAgent.isNotEmpty()) {
-                    Spacer(Modifier.height(10.dp))
-                    byAgent.take(4).forEach { e ->
-                        Row(Modifier.padding(vertical = 2.dp)) {
-                            Text(e.key, color = Glass.Ink, fontSize = 14.sp, modifier = Modifier.weight(1f), maxLines = 1)
-                            Text(money(e.value), color = Glass.Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { PageHeading("Cash", "Keep every payment accounted for") }
+                PeriodMenuButton(state, R.drawable.lc_history)
+            }
+        }
+        item {
+            Box(Modifier.padding(top = 6.dp)) {
+                GlassCard(spacing = 5.dp) {
+                    T("Cash paid · ${monthWord.replaceFirstChar { it.uppercase() }}", 13.sp, Glass.Muted)
+                    T(cur(total, code), 34.sp, Glass.Ink, FontWeight.Bold)
+                    T("${period.size} ${if (period.size == 1) "payment" else "payments"} across $agents ${if (agents == 1) "agent" else "agents"}", 12.sp, Glass.Muted)
                 }
             }
         }
-        item { GlassSearch(search, { search = it }, "Search agent, mode, remarks…") }
+        item { GlassSearch(search, { search = it }, "Search agent, mode or remarks") }
+        item {
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                T("Recent payments", 13.sp, Glass.Ink, FontWeight.SemiBold, Modifier.weight(1f))
+                T("Add payment", 12.sp, Glass.Blue, modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { state.push(Route.EditCash(null)) })
+            }
+        }
         if (rows.isEmpty()) item {
-            GlassCard(Modifier.padding(16.dp)) {
-                Text("No cash paid entries", color = Glass.Ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Text("Tap + then “Cash paid” to record money received.", color = Glass.Muted)
+            GlassCard(spacing = 4.dp) {
+                T("No payments yet", 15.sp, Glass.Ink, FontWeight.Bold)
+                T("Tap + then “Cash paid” to record money received from an agent.", 12.sp, Glass.Muted, maxLines = 2)
             }
         }
         rows.groupBy { it.date }.forEach { (day, list) ->
-            item(key = "c$day") {
-                Text(
-                    dayHeader(day) + "   " + money(list.sumOf { it.amount }),
-                    color = Glass.Muted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 24.dp, top = 14.dp, bottom = 6.dp),
-                )
-                GlassCard(Modifier.padding(horizontal = 16.dp), padding = 4.dp) {
-                    list.forEachIndexed { i, c ->
-                        if (i > 0) RowDivider(68)
-                        ActivityRow(Icons.Filled.Check, Color(0xFF34C759), c.agent.ifBlank { "—" },
-                            listOf(c.mode, c.remarks).filter { it.isNotBlank() }.joinToString(" · "), money(c.amount), true) {
-                            state.push(Route.EditCash(c))
+            item(key = "h$day") { DayHeader(day, cur(list.sumOf { it.amount }, code)) }
+            items(list, key = { it.id }) { c ->
+                GlassCard(padding = PaddingValues(14.dp), onClick = { state.push(Route.EditCash(c)) }) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IconTile(R.drawable.lc_wallet, Glass.GreenBg, Glass.Green)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            T(nice(c.agent).ifBlank { "No agent" }, 14.sp, Glass.Ink, FontWeight.Bold)
+                            T(listOf(sentence(c.mode), c.remarks).filter { it.isNotBlank() }.joinToString(" · "), 11.sp, Glass.Muted)
                         }
+                        T(cur(c.amount, code), 14.sp, Glass.Green, FontWeight.Bold)
                     }
                 }
             }

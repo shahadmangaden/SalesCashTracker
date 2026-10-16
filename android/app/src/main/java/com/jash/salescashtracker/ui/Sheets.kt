@@ -7,34 +7,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -46,84 +32,76 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jash.salescashtracker.R
 import com.jash.salescashtracker.data.Booking
 import com.jash.salescashtracker.data.CashEntry
 import com.jash.salescashtracker.data.Repository
+import com.jash.salescashtracker.ui.theme.Inter
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 
-// ---------- Sheet frame (iOS-style card sliding up) ----------
+private val labelDate = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
+private fun labelDate(iso: String) = runCatching { LocalDate.parse(iso.take(10)).format(labelDate) }.getOrDefault(iso)
 
-@Composable
-fun SheetFrame(
-    title: String,
-    onCancel: () -> Unit,
-    onSave: (() -> Unit)?,
-    saveLabel: String = "Save",
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.94f)
-            .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
-            .background(Brush.verticalGradient(listOf(Color(0xFFF7F9FD), Color(0xFFEEF2F9))))
-            .clickable(enabled = false) {},
-    ) {
-        Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.width(38.dp).height(5.dp).clip(RoundedCornerShape(50)).background(Color(0x33000000)))
-        }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onCancel) { Text("Cancel", fontSize = 17.sp) }
-            Text(title, modifier = Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Glass.Ink,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1)
-            if (onSave != null) TextButton(onClick = onSave) { Text(saveLabel, fontSize = 17.sp, fontWeight = FontWeight.Bold) }
-            else Spacer(Modifier.width(80.dp))
-        }
-        Column(
-            Modifier.fillMaxWidth().weight(1f).imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).navigationBarsPadding(),
-            content = content,
-        )
-    }
+private fun parseNum(s: String): Double? = s.replace(",", "").trim().toDoubleOrNull()
+
+/** Most used values first, then the rest of the list. */
+private fun ranked(used: List<String>, all: List<String>, take: Int): List<String> {
+    val freq = used.filter { it.isNotBlank() }.groupingBy { it }.eachCount()
+    return (freq.entries.sortedByDescending { it.value }.map { it.key } + all).distinct().take(take)
 }
 
-@Composable
-private fun Label(text: String) {
-    Text(text.uppercase(), color = Glass.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp,
-        modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp))
-}
-
+/** Label + wrapping row of choice pills. Values are stored as-is, shown nicely. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Chips(options: List<String>, selected: String, onSelect: (String) -> Unit, color: Color = Glass.Tint) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEach { o -> ChoiceChip(o, o == selected, { onSelect(if (o == selected) "" else o) }, color = color) }
+private fun ChoiceGroup(
+    label: String,
+    options: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    display: (String) -> String = ::sentence,
+    extra: (@Composable () -> Unit)? = null,
+) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FieldLabel(label)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            options.forEach { o -> Choice(display(o), o == selected, { onSelect(o) }) }
+            extra?.invoke()
+        }
     }
 }
 
-/** Today / Yesterday / pick a date (back-dating supported). */
+/** "Sale date · 16 Oct 2026" with Today / Yesterday / Pick date. Back-dating supported. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun DateChips(iso: String, onChange: (String) -> Unit) {
+fun DateChoices(label: String, iso: String, onChange: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val today = LocalDate.now().toString()
     val yesterday = LocalDate.now().minusDays(1).toString()
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        ChoiceChip("Today", iso == today, { onChange(today) })
-        ChoiceChip("Yesterday", iso == yesterday, { onChange(yesterday) })
-        ChoiceChip(if (iso != today && iso != yesterday && iso.isNotBlank()) "📅  ${fdate(iso)}" else "📅  Pick date", iso != today && iso != yesterday, { open = true })
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FieldLabel("$label · ${labelDate(iso)}")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Choice("Today", iso == today, { onChange(today) })
+            Choice("Yesterday", iso == yesterday, { onChange(yesterday) })
+            val other = iso != today && iso != yesterday && iso.isNotBlank()
+            Choice(if (other) labelDate(iso) else "Pick date", other, { open = true })
+        }
     }
     if (open) {
         val initial = runCatching { LocalDate.parse(iso.take(10)) }.getOrNull() ?: LocalDate.now()
@@ -142,49 +120,41 @@ fun DateChips(iso: String, onChange: (String) -> Unit) {
 }
 
 @Composable
-private fun BigButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Button(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Glass.Tint),
-        modifier = modifier.fillMaxWidth().height(54.dp),
-    ) { Text(text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+private fun TextAction(text: String, color: Color = Glass.Blue, onClick: () -> Unit) {
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+        T(text, 14.sp, color, FontWeight.SemiBold)
+    }
 }
 
-private fun parseNum(s: String): Double? = s.replace(",", "").trim().toDoubleOrNull()
-
-/** Most used values first, then the rest of the list. */
-private fun ranked(used: List<String>, all: List<String>, take: Int): List<String> {
-    val freq = used.filter { it.isNotBlank() }.groupingBy { it }.eachCount()
-    return (freq.entries.sortedByDescending { it.value }.map { it.key } + all).distinct().take(take)
+@Composable
+private fun ErrorText(text: String) {
+    if (text.isNotEmpty()) T(text, 12.sp, Glass.Red, FontWeight.SemiBold, maxLines = 2)
 }
 
 // ---------- Quick add chooser ----------
 
 @Composable
 fun QuickAddSheet(state: AppState) {
-    SheetFrame("Add", onCancel = { state.pop() }, onSave = null) {
-        Spacer(Modifier.height(12.dp))
-        GlassCard(onClick = { state.replaceTop(Route.EditSale(null)) }, padding = 18.dp) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconDot(Icons.Filled.ShoppingCart, Color(0xFF0A84FF), 48.dp)
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text("New sale", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Glass.Ink)
-                    Text("Ticket, visa, package, hotel, insurance…", color = Glass.Muted, fontSize = 14.sp)
-                }
-            }
+    SheetFrame("Add", onClose = { state.pop() }, spacing = 12.dp) {
+        QuickOption(R.drawable.lc_tickets_plane, Glass.TileBg, Glass.Blue, "New sale", "Ticket, visa, package, hotel, insurance…") {
+            state.replaceTop(Route.EditSale(null))
         }
-        Spacer(Modifier.height(12.dp))
-        GlassCard(onClick = { state.replaceTop(Route.EditCash(null)) }, padding = 18.dp) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconDot(Icons.Filled.Check, Color(0xFF34C759), 48.dp)
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text("Cash paid", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Glass.Ink)
-                    Text("Money received from an agent or customer", color = Glass.Muted, fontSize = 14.sp)
-                }
+        QuickOption(R.drawable.lc_wallet, Glass.GreenBg, Glass.Green, "Cash paid", "Money received from an agent or customer") {
+            state.replaceTop(Route.EditCash(null))
+        }
+    }
+}
+
+@Composable
+private fun QuickOption(icon: Int, bg: Color, tint: Color, title: String, sub: String, onClick: () -> Unit) {
+    GlassCard(padding = PaddingValues(16.dp), onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconTile(icon, bg, tint, 46.dp, 15.dp, 24.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                T(title, 16.sp, Glass.Ink, FontWeight.Bold)
+                T(sub, 12.sp, Glass.Muted)
             }
+            Lc(R.drawable.lc_chevron_right, Glass.Muted, 18.dp)
         }
     }
 }
@@ -196,6 +166,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
     val lists by Repository.lists.collectAsStateWithLifecycle()
     val all by Repository.bookings.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
+    val code = LocalCurrency.current
     val existing = original != null && !isCopy && all.any { it.id == original.id }
     val b0 = original ?: Booking()
 
@@ -228,7 +199,9 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
     var entryDate by remember { mutableStateOf(b0.entryDate) }
     val hasDetails = listOf(b0.detail, b0.customerType, b0.sector, b0.contact, b0.ref, b0.pnr, b0.serviceDate, b0.bookingStatus, b0.docType, b0.entryDate).any { it.isNotBlank() }
     var showMore by remember { mutableStateOf(hasDetails) }
-    var otherAgent by remember { mutableStateOf(false) }
+    var addAgent by remember { mutableStateOf(false) }
+    var allProducts by remember { mutableStateOf(false) }
+    var allModes by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var confirmDelete by remember { mutableStateOf(false) }
 
@@ -257,81 +230,72 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
         else state.pop()
     }
 
-    SheetFrame(if (existing) "Edit sale" else "New sale", onCancel = { state.pop() }, onSave = { save(false) }) {
-        if (error.isNotEmpty()) Text(error, color = Color(0xFFC62828), fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp, start = 4.dp))
+    SheetFrame(if (existing) "Edit sale" else "New sale", onClose = { state.pop() }) {
+        ErrorText(error)
+        DateChoices("Sale date", date) { date = it }
 
-        Label("Date")
-        DateChips(date) { date = it }
+        GlassInput("Customer name", customer, { customer = it; error = "" }, placeholder = "Customer name",
+            icon = R.drawable.lc_user_round, caps = KeyboardCapitalization.Words)
 
-        Label("Customer")
-        OutlinedTextField(
-            customer, { customer = it; error = "" }, placeholder = { Text("Customer name") }, singleLine = true,
-            shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
-        )
+        val agentOptions = ranked(all.map { it.agent }, lists.agents, 5).let { if (agent.isNotBlank() && agent !in it) listOf(agent) + it else it }
+        ChoiceGroup("Agent", agentOptions, agent, { agent = it; addAgent = false }, display = ::nice) {
+            Choice("+ Add", addAgent, { addAgent = !addAgent; if (addAgent) agent = "" })
+        }
+        if (addAgent) GlassInput(null, agent, { agent = it }, placeholder = "New agent name", caps = KeyboardCapitalization.Characters)
 
-        Label("Agent")
-        val agentOptions = ranked(all.map { it.agent }, lists.agents, 7)
-        Chips(agentOptions + "Other…", if (otherAgent) "Other…" else agent, { v ->
-            if (v == "Other…") { otherAgent = true; agent = "" } else { otherAgent = false; agent = v }
-        }, color = Color(0xFF5856D6))
-        if (otherAgent || (agent.isNotBlank() && agent !in agentOptions)) {
-            Spacer(Modifier.height(8.dp))
-            DropdownField("Agent name", agent, lists.agents, { agent = it }, editable = true)
+        val productOptions = if (allProducts) lists.categories else
+            ranked(all.map { it.category }, lists.categories, 6).let { if (category.isNotBlank() && category !in it) listOf(category) + it else it }
+        ChoiceGroup("Product", productOptions, category, { category = it }) {
+            if (lists.categories.size > productOptions.size || allProducts) Choice(if (allProducts) "Less" else "More…", false, { allProducts = !allProducts })
         }
 
-        Label("Product")
-        val catOptions = ranked(all.map { it.category }, lists.categories, 8)
-        Chips(catOptions, category, { category = it }, color = Color(0xFFFF9500))
-        if (category.isNotBlank() && category !in catOptions) {
-            Spacer(Modifier.height(8.dp)); DropdownField("Product", category, lists.categories, { category = it })
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            GlassInput("Selling price · $code", selling, { selling = it; error = "" }, Modifier.weight(1f), placeholder = "0", keyboard = KeyboardType.Decimal)
+            GlassInput("Net cost · $code", cost, { cost = it }, Modifier.weight(1f), placeholder = "0", keyboard = KeyboardType.Decimal)
+        }
+        live.profit?.let { p ->
+            val good = p >= 0
+            Row(
+                Modifier.fillMaxWidth().height(37.dp).clip(RoundedCornerShape(12.dp)).background(if (good) Glass.GreenBg else Glass.RedBg).padding(horizontal = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                T(if (good) "Your profit" else "Loss", 12.sp, if (good) Glass.Green else Glass.Red, FontWeight.SemiBold, Modifier.weight(1f))
+                T("${cur(p, code)}  ·  ${pctWhole(live.margin ?: 0.0)}", 14.sp, if (good) Glass.Green else Glass.Red, FontWeight.Bold)
+            }
         }
 
-        Label("Price")
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(selling, { selling = it; error = "" }, label = { Text("Selling price") }, singleLine = true,
-                shape = RoundedCornerShape(14.dp), modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                textStyle = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold))
-            OutlinedTextField(cost, { cost = it }, label = { Text("Net cost") }, singleLine = true,
-                shape = RoundedCornerShape(14.dp), modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                textStyle = TextStyle(fontSize = 20.sp))
-        }
-        if (live.profit != null) {
-            Spacer(Modifier.height(8.dp))
-            val p = live.profit ?: 0.0
-            Text("Profit ${money(p)}   ·   ${pct(live.margin)}", color = if (p >= 0) Color(0xFF1A7F37) else Color(0xFFC62828),
-                fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(start = 4.dp))
-        }
-
-        Label("Payment")
-        Chips(listOf("Fully paid", "Partly paid", "Not paid"),
-            when (pay) { "PAID" -> "Fully paid"; "PARTIAL" -> "Partly paid"; "PENDING" -> "Not paid"; else -> "" },
-            { v -> pay = when (v) { "Fully paid" -> "PAID"; "Partly paid" -> "PARTIAL"; "Not paid" -> "PENDING"; else -> pay } },
-            color = Color(0xFF34C759))
+        ChoiceGroup("Payment status", listOf("PAID", "PARTIAL", "PENDING"), pay, { pay = it },
+            display = { when (it) { "PAID" -> "Fully paid"; "PARTIAL" -> "Partly paid"; else -> "Not paid" } })
         if (pay == "PARTIAL") {
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(partial, { partial = it }, label = { Text("Amount paid") }, singleLine = true,
-                shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-            val bal = live.balance
-            if (bal != null) Text("Balance due ${money(bal)}", color = Color(0xFFC62828), fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
+            GlassInput(null, partial, { partial = it }, placeholder = "Amount received", keyboard = KeyboardType.Decimal)
+            Row(
+                Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.86f)).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                T("Received · ${cur(parseNum(partial) ?: 0.0, code)}", 12.sp, Glass.Muted, modifier = Modifier.weight(1f))
+                T("Due ${amt(live.balance ?: 0.0)}", 12.sp, Glass.Blue, FontWeight.SemiBold)
+            }
         }
         if (pay != "PENDING") {
-            Spacer(Modifier.height(10.dp))
-            Chips(ranked(all.map { it.paymentMode }, lists.paymentModes, 5), mode, { mode = it.ifBlank { mode } }, color = Color(0xFF34C759))
+            val modeOptions = if (allModes) lists.paymentModes else
+                ranked(all.map { it.paymentMode }, lists.paymentModes, 3).let { if (mode.isNotBlank() && mode !in it) listOf(mode) + it else it }
+            ChoiceGroup("Payment mode", modeOptions, mode, { mode = it }) {
+                if (lists.paymentModes.size > modeOptions.size || allModes) Choice(if (allModes) "Less" else "More…", false, { allModes = !allModes })
+            }
         }
 
-        Spacer(Modifier.height(18.dp))
-        Text(
-            if (showMore) "Hide details ▲" else "More details (PNR, sector, visa, contact…) ▼",
-            color = Glass.Tint, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
-            modifier = Modifier.clickable { showMore = !showMore }.padding(4.dp),
-        )
+        Row(
+            Modifier.fillMaxWidth().height(30.dp).clip(RoundedCornerShape(8.dp)).clickable { showMore = !showMore },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            T("More details", 13.sp, Glass.Ink, FontWeight.SemiBold, Modifier.weight(1f))
+            T("Passport, travel date, notes", 11.sp, Glass.Muted)
+            Lc(R.drawable.lc_chevron_down, Glass.Muted, 16.dp, Modifier.rotate(if (showMore) 180f else 0f))
+        }
         AnimatedVisibility(showMore) {
-            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                DropdownField("Service detail", detail, all.map { it.detail }.filter { it.isNotBlank() }.distinct().sorted(), { detail = it }, editable = true)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                DropdownField("Service detail / notes", detail, all.map { it.detail }.filter { it.isNotBlank() }.distinct().sorted(), { detail = it }, editable = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     DropdownField("Customer type", customerType, lists.customerTypes, { customerType = it }, Modifier.weight(1f))
                     FormField("Pax", pax, { pax = it }, Modifier.weight(0.5f), keyboard = KeyboardType.Number)
@@ -341,7 +305,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
                     FormField("PNR", pnr, { pnr = it }, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FormField("Flights / ref", ref, { ref = it }, Modifier.weight(1f))
+                    FormField("Passport / ref", ref, { ref = it }, Modifier.weight(1f))
                     FormField("Contact", contact, { contact = it }, Modifier.weight(1f), keyboard = KeyboardType.Phone)
                 }
                 DateField("Travel / service date", serviceDate, { serviceDate = it }, allowClear = true)
@@ -352,31 +316,29 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
                 }
                 live.expireDate(lists.docTypes)?.let { exp ->
                     val left = live.daysLeft(lists.docTypes) ?: 0L
-                    Text("Visa expires ${fdate(exp.toString())} · $left days left",
-                        color = if (left <= 7) Color(0xFFC62828) else Glass.Ink, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 4.dp))
+                    T("Visa expires ${labelDate(exp.toString())} · " + if (left < 0) "${-left} days ago" else "$left days left",
+                        12.sp, if (left <= 7) Glass.Red else Glass.Ink, FontWeight.SemiBold)
                 }
             }
         }
 
-        Spacer(Modifier.height(20.dp))
-        BigButton(if (existing) "Save changes" else "Save sale", { save(false) })
-        if (!existing) {
-            TextButton(onClick = { save(true) }, modifier = Modifier.fillMaxWidth()) { Text("Save & add another", fontSize = 16.sp) }
-        } else {
-            TextButton(onClick = {
+        ErrorText(error)
+        PrimaryButton(if (existing) "Save changes" else "Save sale", R.drawable.lc_check, { save(false) })
+        if (!existing) TextAction("Save & add another") { save(true) }
+        else {
+            TextAction("Duplicate as new sale") {
                 state.replaceTop(Route.EditSale(build().copy(id = UUID.randomUUID().toString(), customer = "", pnr = "", contact = "", createdAt = ""), isCopy = true))
-            }, modifier = Modifier.fillMaxWidth()) { Text("Duplicate as new sale", fontSize = 16.sp) }
-            TextButton(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth()) { Text("Delete sale", color = Color(0xFFC62828), fontSize = 16.sp) }
+            }
+            TextAction("Delete sale", Glass.Red) { confirmDelete = true }
         }
-        Spacer(Modifier.height(24.dp))
     }
 
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete this sale?") },
-            text = { Text("${b0.customer} · ${fdate(b0.date)} · ${money(b0.sellingPrice)}\nIt will be removed on all your devices.") },
-            confirmButton = { TextButton(onClick = { Repository.deleteBooking(b0.id); confirmDelete = false; state.pop() }) { Text("Delete", color = Color(0xFFC62828)) } },
+            text = { Text("${nice(b0.customer)} · ${labelDate(b0.date)} · ${cur(b0.sellingPrice, code)}\nIt will be removed on all your devices.") },
+            confirmButton = { TextButton(onClick = { Repository.deleteBooking(b0.id); confirmDelete = false; state.pop() }) { Text("Delete", color = Glass.Red) } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
         )
     }
@@ -390,6 +352,7 @@ fun CashSheet(original: CashEntry?, state: AppState) {
     val allCash by Repository.cash.collectAsStateWithLifecycle()
     val bookings by Repository.bookings.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
+    val code = LocalCurrency.current
     val existing = original != null && allCash.any { it.id == original.id }
     val c0 = original ?: CashEntry()
 
@@ -398,7 +361,8 @@ fun CashSheet(original: CashEntry?, state: AppState) {
     var agent by remember { mutableStateOf(c0.agent) }
     var mode by remember { mutableStateOf(c0.mode.ifBlank { "CASH" }) }
     var remarks by remember { mutableStateOf(c0.remarks) }
-    var otherAgent by remember { mutableStateOf(false) }
+    var addAgent by remember { mutableStateOf(false) }
+    var allModes by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var confirmDelete by remember { mutableStateOf(false) }
 
@@ -407,49 +371,57 @@ fun CashSheet(original: CashEntry?, state: AppState) {
         if (a == null) { error = "Enter the amount"; return }
         Repository.saveCash(c0.copy(id = if (existing) c0.id else UUID.randomUUID().toString(), date = date, amount = a,
             agent = agent.trim().uppercase(), mode = mode, remarks = remarks.trim()))
-        Toast.makeText(ctx, "Cash paid saved", Toast.LENGTH_SHORT).show()
+        Toast.makeText(ctx, "Payment saved", Toast.LENGTH_SHORT).show()
         if (again) state.replaceTop(Route.EditCash(CashEntry(date = date, agent = agent.trim().uppercase(), mode = mode))) else state.pop()
     }
 
-    SheetFrame(if (existing) "Edit cash paid" else "Cash paid", onCancel = { state.pop() }, onSave = { save(false) }) {
-        if (error.isNotEmpty()) Text(error, color = Color(0xFFC62828), fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp, start = 4.dp))
-        Label("Amount")
-        OutlinedTextField(
-            amount, { amount = it; error = "" }, placeholder = { Text("0.00", fontSize = 34.sp) }, singleLine = true,
-            shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            textStyle = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A7F37)),
-        )
-        Label("From agent / customer")
-        val agentOptions = ranked(allCash.map { it.agent } + bookings.map { it.agent }, lists.agents, 7)
-        Chips(agentOptions + "Other…", if (otherAgent) "Other…" else agent, { v ->
-            if (v == "Other…") { otherAgent = true; agent = "" } else { otherAgent = false; agent = v }
-        }, color = Color(0xFF5856D6))
-        if (otherAgent || (agent.isNotBlank() && agent !in agentOptions)) {
-            Spacer(Modifier.height(8.dp)); DropdownField("Agent name", agent, lists.agents, { agent = it }, editable = true)
+    SheetFrame(if (existing) "Edit payment" else "Cash paid", onClose = { state.pop() }, spacing = 16.dp) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            T("AMOUNT · $code", 12.sp, Glass.Muted)
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
+                if (amount.isEmpty()) T("0", 44.sp, Glass.Muted.copy(alpha = 0.45f), FontWeight.Bold)
+                BasicTextField(
+                    amount, { amount = it; error = "" }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    textStyle = TextStyle(fontFamily = Inter, fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Glass.Ink, textAlign = TextAlign.Center),
+                    cursorBrush = SolidColor(Glass.Blue),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                )
+            }
+            ErrorText(error)
         }
-        Label("Date")
-        DateChips(date) { date = it }
-        Label("Paid by")
-        Chips(ranked(allCash.map { it.mode }, lists.paymentModes, 6), mode, { mode = it.ifBlank { mode } }, color = Color(0xFF34C759))
-        Label("Remarks (optional)")
-        OutlinedTextField(remarks, { remarks = it }, placeholder = { Text("Receipt no., note…") },
-            shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(20.dp))
-        BigButton(if (existing) "Save changes" else "Save cash paid", { save(false) })
-        if (!existing) TextButton(onClick = { save(true) }, modifier = Modifier.fillMaxWidth()) { Text("Save & add another", fontSize = 16.sp) }
-        else TextButton(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth()) { Text("Delete entry", color = Color(0xFFC62828), fontSize = 16.sp) }
-        Spacer(Modifier.height(24.dp))
+
+        val agentOptions = ranked(allCash.map { it.agent } + bookings.map { it.agent }, lists.agents, 5)
+            .let { if (agent.isNotBlank() && agent !in it) listOf(agent) + it else it }
+        ChoiceGroup("Paid to agent", agentOptions, agent, { agent = it; addAgent = false }, display = ::nice) {
+            Choice("+ Add", addAgent, { addAgent = !addAgent; if (addAgent) agent = "" })
+        }
+        if (addAgent) GlassInput(null, agent, { agent = it }, placeholder = "Agent name", caps = KeyboardCapitalization.Characters)
+
+        DateChoices("Payment date", date) { date = it }
+
+        val modeOptions = if (allModes) lists.paymentModes else
+            ranked(allCash.map { it.mode }, lists.paymentModes, 3).let { if (mode.isNotBlank() && mode !in it) listOf(mode) + it else it }
+        ChoiceGroup("Payment mode", modeOptions, mode, { mode = it }) {
+            if (lists.paymentModes.size > modeOptions.size || allModes) Choice(if (allModes) "Less" else "More…", false, { allModes = !allModes })
+        }
+
+        GlassInput("Remarks · optional", remarks, { remarks = it }, placeholder = "Receipt no., note…", icon = R.drawable.lc_pencil_line,
+            caps = KeyboardCapitalization.Sentences)
+
+        Column {
+            PrimaryButton(if (existing) "Save changes" else "Save payment", R.drawable.lc_check, { save(false) })
+            if (!existing) TextAction("Save & add another") { save(true) }
+            else TextAction("Delete payment", Glass.Red) { confirmDelete = true }
+        }
     }
 
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Delete this cash entry?") },
-            text = { Text("${c0.agent} · ${fdate(c0.date)} · ${money(c0.amount)}") },
-            confirmButton = { TextButton(onClick = { Repository.deleteCash(c0.id); confirmDelete = false; state.pop() }) { Text("Delete", color = Color(0xFFC62828)) } },
+            title = { Text("Delete this payment?") },
+            text = { Text("${nice(c0.agent)} · ${labelDate(c0.date)} · ${cur(c0.amount, code)}") },
+            confirmButton = { TextButton(onClick = { Repository.deleteCash(c0.id); confirmDelete = false; state.pop() }) { Text("Delete", color = Glass.Red) } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
         )
     }
 }
-

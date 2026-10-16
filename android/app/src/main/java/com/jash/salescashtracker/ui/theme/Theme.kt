@@ -1,5 +1,6 @@
 package com.jash.salescashtracker.ui.theme
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -7,41 +8,52 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.jash.salescashtracker.R
 
-// iOS-inspired palette on top of Material 3
+/** Inter, as used throughout the Figma design. */
+val Inter = FontFamily(
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_medium, FontWeight.Medium),
+    Font(R.font.inter_semibold, FontWeight.SemiBold),
+    Font(R.font.inter_bold, FontWeight.Bold),
+)
+
+// Older palette names still referenced by shared form components.
 object AppColors {
-    val Navy = Color(0xFF13294B)
-    val Blue = Color(0xFF0A84FF)
-    val Green = Color(0xFF34C759)
-    val GreenText = Color(0xFF1A7F37)
-    val Orange = Color(0xFFFF9500)
-    val OrangeText = Color(0xFFB25E00)
-    val Red = Color(0xFFFF3B30)
-    val RedText = Color(0xFFC62828)
-    val GroupedBg = Color(0xFFF2F2F7)
+    val Navy = Color(0xFF16243D)
+    val Blue = Color(0xFF246BFD)
+    val Green = Color(0xFF167E65)
+    val GreenText = Color(0xFF167E65)
+    val Orange = Color(0xFFA26622)
+    val OrangeText = Color(0xFFA26622)
+    val Red = Color(0xFFBD5260)
+    val RedText = Color(0xFFBD5260)
+    val GroupedBg = Color(0xFFF4F7FC)
     val Card = Color(0xFFFFFFFF)
-    val Separator = Color(0xFFE5E5EA)
-    val Label = Color(0xFF1C1C1E)
-    val Secondary = Color(0xFF8E8E93)
-    val Fill = Color(0xFFEFEFF4)
+    val Separator = Color(0xFFD9E2EF)
+    val Label = Color(0xFF16243D)
+    val Secondary = Color(0xFF64728B)
+    val Fill = Color(0xFFE8EEF8)
 }
 
 private val colors = lightColorScheme(
     primary = AppColors.Blue,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE3F0FF),
-    onPrimaryContainer = Color(0xFF00315F),
+    primaryContainer = Color(0xFFE6EEFF),
+    onPrimaryContainer = AppColors.Navy,
     secondary = AppColors.Navy,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE3F0FF),
+    secondaryContainer = Color(0xFFE6EEFF),
     onSecondaryContainer = AppColors.Navy,
     background = AppColors.GroupedBg,
     onBackground = AppColors.Label,
-    surface = AppColors.GroupedBg,
+    surface = Color(0xFFF7FAFF),
     onSurface = AppColors.Label,
     surfaceVariant = AppColors.Fill,
     onSurfaceVariant = AppColors.Secondary,
@@ -49,32 +61,38 @@ private val colors = lightColorScheme(
     surfaceContainerLow = Color.White,
     surfaceContainerHigh = Color.White,
     surfaceContainerHighest = AppColors.Fill,
-    outline = Color(0xFFC7C7CC),
+    outline = Color(0xFFD9E2EF),
     outlineVariant = AppColors.Separator,
     error = AppColors.Red,
 )
 
+private fun s(size: Int, weight: FontWeight = FontWeight.Normal) =
+    TextStyle(fontFamily = Inter, fontSize = size.sp, fontWeight = weight, lineHeight = 1.3.em)
+
 private val typography = Typography(
-    displaySmall = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp),
-    headlineMedium = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold),
-    headlineSmall = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
-    titleLarge = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold),
-    titleSmall = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontSize = 17.sp),
-    bodyMedium = TextStyle(fontSize = 15.sp),
-    bodySmall = TextStyle(fontSize = 13.sp),
-    labelLarge = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
-    labelMedium = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.4.sp),
+    displayLarge = s(38, FontWeight.Bold),
+    displayMedium = s(36, FontWeight.Bold),
+    displaySmall = s(32, FontWeight.Bold),
+    headlineLarge = s(30, FontWeight.Bold),
+    headlineMedium = s(26, FontWeight.Bold),
+    headlineSmall = s(22, FontWeight.Bold),
+    titleLarge = s(18, FontWeight.Bold),
+    titleMedium = s(16, FontWeight.SemiBold),
+    titleSmall = s(14, FontWeight.SemiBold),
+    bodyLarge = s(14),
+    bodyMedium = s(13),
+    bodySmall = s(12),
+    labelLarge = s(14, FontWeight.SemiBold),
+    labelMedium = s(12, FontWeight.Medium),
+    labelSmall = s(11, FontWeight.Medium),
 )
 
 private val shapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(14.dp),
-    large = RoundedCornerShape(18.dp),
-    extraLarge = RoundedCornerShape(26.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(15.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(32.dp),
 )
 
 @Composable

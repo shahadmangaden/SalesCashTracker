@@ -1,31 +1,26 @@
 package com.jash.salescashtracker.ui
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jash.salescashtracker.R
 import com.jash.salescashtracker.data.Repository
 import com.jash.salescashtracker.data.Totals
 import java.time.LocalTime
@@ -39,102 +34,111 @@ fun HomeScreen(state: AppState) {
     val cash by Repository.cash.collectAsStateWithLifecycle()
     val lists by Repository.lists.collectAsStateWithLifecycle()
     val settings by Repository.settings.collectAsStateWithLifecycle()
+    val code = LocalCurrency.current
 
     val pb = bookings.filter { state.inPeriod(it.date) }
     val pc = cash.filter { state.inPeriod(it.date) }
     val t = Totals.of(pb, pc)
-    val cur = settings.currency
     val hour = LocalTime.now().hour
     val greet = when { hour < 12 -> "Good morning"; hour < 17 -> "Good afternoon"; else -> "Good evening" }
-    val firstName = settings.user.split(" ").firstOrNull()?.lowercase()?.replaceFirstChar { it.uppercase() } ?: ""
+    val firstName = nice(settings.user.split(" ").firstOrNull() ?: "")
 
-    // Last 6 months of sales for the chart
-    val now = YearMonth.now()
+    // Six months of sales ending at the selected month
+    val end = if (state.month == "all") YearMonth.now() else runCatching { YearMonth.parse(state.month) }.getOrDefault(YearMonth.now())
     val mf = DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)
-    val chart = (5 downTo 0).map { i ->
-        val ym = now.minusMonths(i.toLong())
-        ym.format(mf) to bookings.filter { it.date.startsWith(ym.toString()) }.sumOf { it.sellingPrice ?: 0.0 }
+    fun monthSales(ym: YearMonth) = bookings.filter { it.date.startsWith(ym.toString()) }.sumOf { it.sellingPrice ?: 0.0 }
+    val chart = (5 downTo 0).map { i -> end.minusMonths(i.toLong()).let { it.format(mf) to monthSales(it) } }
+    val growth: Double? = if (state.month == "all") null else {
+        val prev = monthSales(end.minusMonths(1))
+        if (prev > 0) (t.sales - prev) / prev else null
     }
 
     val expiring = bookings.mapNotNull { b -> b.daysLeft(lists.docTypes)?.let { b to it } }
         .filter { (b, d) -> d in 0..7 && b.bookingStatus !in listOf("CANCELLED", "REFUND") }
         .sortedBy { it.second }
-    val dueByAgent = bookings.groupBy { it.agent.ifBlank { "No agent" } }
-        .map { (a, list) -> a to (Totals.of(list, cash.filter { it.agent.ifBlank { "No agent" } == a }).remaining) }
+    val dueAgents = bookings.groupBy { it.agent.ifBlank { "No agent" } }
+        .map { (a, list) -> a to Totals.of(list, cash.filter { it.agent.ifBlank { "No agent" } == a }).remaining }
         .filter { it.second > 0.5 }
-        .sortedByDescending { it.second }
-        .take(3)
+    val toCollect = dueAgents.sumOf { it.second }
 
-    data class Activity(val date: String, val sort: String, val title: String, val sub: String, val amount: String, val isCash: Boolean, val open: () -> Unit)
+    data class Activity(val sort: String, @DrawableRes val icon: Int, val cash: Boolean, val title: String, val sub: String, val amount: String, val open: () -> Unit)
     val activity = (
-        bookings.map { b -> Activity(b.date, b.date + b.createdAt, b.customer, listOf(b.category, b.agent).filter { it.isNotBlank() }.joinToString(" · "), money(b.sellingPrice), false) { state.push(Route.EditSale(b)) } } +
-            cash.map { c -> Activity(c.date, c.date + c.createdAt, c.agent.ifBlank { "Cash paid" }, "Cash paid · ${c.mode}", "+" + money(c.amount), true) { state.push(Route.EditCash(c)) } }
-        ).sortedByDescending { it.sort }.take(8)
-
-    LazyColumn {
-        item {
-            PageHeader(
-                title = if (firstName.isNotBlank()) "$greet," else greet,
-                subtitle = settings.company,
-                actions = { SyncChip() },
-            )
-            if (firstName.isNotBlank()) Text(firstName, color = Glass.Ink, fontSize = 34.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 20.dp, bottom = 6.dp).padding(top = 0.dp))
+        bookings.map { b ->
+            Activity(b.date + b.createdAt, productIcon(b.category), false,
+                listOf(nice(b.customer), sentence(b.category)).filter { it.isNotBlank() }.joinToString(" · "),
+                listOf(nice(b.agent), dayHeader(b.date)).filter { it.isNotBlank() }.joinToString(" · "),
+                cur(b.sellingPrice, code)) { state.push(Route.EditSale(b)) }
+        } + cash.map { c ->
+            Activity(c.date + c.createdAt, R.drawable.lc_wallet, true,
+                "Cash paid · ${nice(c.agent).ifBlank { "No agent" }}",
+                listOf(sentence(c.mode), dayHeader(c.date)).filter { it.isNotBlank() }.joinToString(" · "),
+                "+" + cur(c.amount, code)) { state.push(Route.EditCash(c)) }
         }
+        ).sortedByDescending { it.sort }.take(6)
+
+    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) { PeriodPill(state) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    T(if (firstName.isNotBlank()) "$greet, $firstName" else greet, 13.sp, Glass.Muted)
+                    T("Your overview", 30.sp, Glass.Ink, FontWeight.Bold)
+                }
+                PeriodChip(state)
+            }
         }
 
         // Hero card
         item {
-            GlassCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), padding = 18.dp) {
-                Text("Total sales", color = Glass.Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(money(t.sales), color = Glass.Ink, fontSize = 38.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.width(6.dp))
-                    Text(cur, color = Glass.Muted, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 7.dp))
+            GlassCard(spacing = 8.dp, onClick = { state.tab = Tab.Reports }) {
+                Row(verticalAlignment = Alignment.Top) {
+                    T("Total sales $code", 13.sp, Glass.Muted, FontWeight.SemiBold, Modifier.weight(1f))
+                    Lc(R.drawable.lc_arrow_up_right, Glass.Blue, 17.dp)
                 }
-                Text(
-                    "Profit ${money(t.profit)}  ·  ${pct(t.margin)} margin  ·  ${t.count} bookings",
-                    color = Color(0xFF1A7F37), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    T(amt(t.sales), 38.sp, Glass.Ink, FontWeight.Bold, Modifier.weight(1f))
+                    if (growth != null) {
+                        if (growth >= 0) StatusPill("↗ ${pct(growth)}", Glass.Green, Glass.GreenBg, 11.sp)
+                        else StatusPill("↘ ${pct(-growth)}", Glass.Red, Glass.RedBg, 11.sp)
+                    }
+                }
+                T("Profit ${cur(t.profit, code)}  ·  ${pctWhole(t.margin)} margin", 12.sp, Glass.Muted)
                 BarChart(chart)
             }
         }
 
-        // Quick stats
+        // Key figures
         item {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    GlassStat("Balance due", money(t.balance), Modifier.weight(1f), sub = "on bookings",
-                        valueColor = if (t.balance > 0) Color(0xFFB25E00) else Glass.Ink, onClick = { state.tab = Tab.Sales })
-                    GlassStat("Cash paid", money(t.cash), Modifier.weight(1f), sub = "${t.cashCount} entries",
-                        valueColor = Color(0xFF1A7F37), onClick = { state.tab = Tab.Cash })
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MetricTile(R.drawable.lc_hand_coins, "Balance due · $code", amt(t.balance), Modifier.weight(1f)) { state.tab = Tab.Sales }
+                    MetricTile(R.drawable.lc_wallet, "Cash paid · $code", amt(t.cash), Modifier.weight(1f)) { state.tab = Tab.Cash }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    GlassStat("Net remaining", money(t.remaining), Modifier.weight(1f), sub = "balance − cash",
-                        valueColor = if (t.remaining > 0) Color(0xFFC62828) else Glass.Ink, onClick = { state.tab = Tab.Reports })
-                    GlassStat("Passengers", num(t.pax), Modifier.weight(1f), sub = "served")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MetricTile(R.drawable.lc_landmark, "Net remaining · $code", amt(t.remaining), Modifier.weight(1f)) {
+                        state.reportsPage = "agents"; state.tab = Tab.Reports
+                    }
+                    MetricTile(R.drawable.lc_users, "Passengers", num(t.pax).ifBlank { "0" }, Modifier.weight(1f))
                 }
             }
         }
 
         // Needs attention
-        if (expiring.isNotEmpty() || dueByAgent.isNotEmpty()) {
-            item { SectionTitle("Needs attention") }
+        if (expiring.isNotEmpty() || toCollect > 0.5) {
             item {
-                GlassCard(Modifier.padding(horizontal = 16.dp), padding = 4.dp) {
-                    expiring.take(3).forEachIndexed { i, (b, d) ->
-                        if (i > 0) RowDivider(68)
-                        ActivityRow(Icons.Filled.Warning, Color(0xFFFF3B30), b.customer, "${b.docType} visa expires ${if (d == 0L) "today" else "in $d days"}", "", false) {
-                            state.push(Route.EditSale(b))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionHeading("Needs attention", "View all") { state.reportsPage = if (expiring.isNotEmpty()) "visas" else "agents"; state.tab = Tab.Reports }
+                    GlassCard(padding = PaddingValues(13.dp), spacing = 12.dp) {
+                        if (expiring.isNotEmpty()) {
+                            val (b, d) = expiring.first()
+                            AttentionRow(R.drawable.lc_calendar_clock, Glass.Amber,
+                                if (expiring.size == 1) "1 visa expires this week" else "${expiring.size} visas expire this week",
+                                "${nice(b.customer)} expires ${whenLeft(d)}") { state.reportsPage = "visas"; state.tab = Tab.Reports }
                         }
-                    }
-                    dueByAgent.forEachIndexed { i, (a, amt) ->
-                        if (i > 0 || expiring.isNotEmpty()) RowDivider(68)
-                        ActivityRow(Icons.Filled.Person, Color(0xFFFF9500), a, "Still to collect", money(amt), false) {
-                            state.reportsPage = "agents"; state.tab = Tab.Reports
+                        if (toCollect > 0.5) {
+                            AttentionRow(R.drawable.lc_hand_coins, Glass.Blue,
+                                "Collect ${cur(toCollect, code)} from ${dueAgents.size} ${if (dueAgents.size == 1) "agent" else "agents"}", null) {
+                                state.reportsPage = "agents"; state.tab = Tab.Reports
+                            }
                         }
                     }
                 }
@@ -142,23 +146,27 @@ fun HomeScreen(state: AppState) {
         }
 
         // Recent activity
-        item { SectionTitle("Recent activity", action = if (activity.isNotEmpty()) "See all" else null, onAction = { state.tab = Tab.Sales }) }
         item {
-            if (activity.isEmpty()) {
-                GlassCard(Modifier.padding(horizontal = 16.dp)) {
-                    Text("You're starting fresh", color = Glass.Ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(4.dp))
-                    Text("Tap the blue + button to add your first sale or cash payment. It only takes a few taps.", color = Glass.Muted, fontSize = 15.sp)
-                }
-            } else {
-                GlassCard(Modifier.padding(horizontal = 16.dp), padding = 4.dp) {
-                    activity.forEachIndexed { i, a ->
-                        if (i > 0) RowDivider(68)
-                        ActivityRow(
-                            if (a.isCash) Icons.Filled.Check else Icons.Filled.ShoppingCart,
-                            if (a.isCash) Color(0xFF34C759) else Color(0xFF0A84FF),
-                            a.title, "${dayHeader(a.date)} · ${a.sub}", a.amount, a.isCash, a.open,
-                        )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionHeading("Recent activity", if (activity.isNotEmpty()) "See all" else null) { state.tab = Tab.Sales }
+                GlassCard(padding = PaddingValues(12.dp), spacing = 4.dp) {
+                    if (activity.isEmpty()) {
+                        T("You're starting fresh", 14.sp, Glass.Ink, FontWeight.SemiBold)
+                        T("Tap the blue + to add your first sale or cash payment.", 12.sp, Glass.Muted, maxLines = 3)
+                    }
+                    activity.forEach { a ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = a.open).padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Lc(a.icon, if (a.cash) Glass.Green else Glass.Blue, 20.dp)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                T(a.title, 12.sp, Glass.Ink, FontWeight.SemiBold)
+                                T(a.sub, 10.sp, Glass.Muted)
+                            }
+                            T(a.amount, 13.sp, if (a.cash) Glass.Green else Glass.Ink, FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -168,31 +176,26 @@ fun HomeScreen(state: AppState) {
 }
 
 @Composable
-fun ActivityRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    color: Color,
-    title: String,
-    sub: String,
-    amount: String,
-    positive: Boolean,
-    onClick: () -> Unit,
-) {
+private fun AttentionRow(@DrawableRes icon: Int, tint: Color, title: String, sub: String?, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickableRow(onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        IconDot(icon, color)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title.ifBlank { "—" }, color = Glass.Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(sub, color = Glass.Muted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Lc(icon, tint, 19.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            T(title, 13.sp, Glass.Ink, FontWeight.SemiBold)
+            if (sub != null) T(sub, 11.sp, Glass.Muted)
         }
-        if (amount.isNotBlank()) {
-            Spacer(Modifier.width(8.dp))
-            Text(amount, color = if (positive) Color(0xFF1A7F37) else Glass.Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        }
+        Lc(R.drawable.lc_chevron_right, Glass.Ink, 16.dp)
     }
 }
 
-fun Modifier.clickableRow(onClick: () -> Unit): Modifier = this.clickable(onClick = onClick)
+/** 0 -> "today", 1 -> "tomorrow", n -> "in n days" */
+fun whenLeft(d: Long): String = when (d) { 0L -> "today"; 1L -> "tomorrow"; else -> "in $d days" }
 
+/** 0.15 -> "15%", 0.125 -> "12.5%" */
+fun pctWhole(v: Double): String {
+    val p = v * 100
+    return if (Math.abs(p - Math.round(p)) < 0.05) "${Math.round(p)}%" else String.format(Locale.ENGLISH, "%.1f%%", p)
+}
