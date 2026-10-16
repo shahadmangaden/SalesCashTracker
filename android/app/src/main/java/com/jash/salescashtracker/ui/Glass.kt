@@ -145,33 +145,33 @@ fun productIcon(category: String): Int {
 // ---------- Surfaces ----------
 
 /** Pastel gradient backdrop with the soft glow from the design. */
+/** Colourful soft backdrop the glass sits on (the look from the first Liquid Glass version). */
 @Composable
 fun GlassBackground(content: @Composable BoxScope.() -> Unit) {
-    Box(
-        Modifier.fillMaxSize().background(
-            Brush.verticalGradient(
-                0f to Color(0xFFE5F0FF), 0.42f to Color(0xFFECE9FA), 0.76f to Color(0xFFE6F4EF), 1f to Color(0xFFF4F7FC),
-            ),
-        ),
-    ) {
+    Box(Modifier.fillMaxSize().background(Color(0xFFEFF3FB))) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width; val h = size.height
-            val c = Offset(w * 0.86f, h * 0.33f)
-            val r = w * 0.48f
-            drawCircle(Brush.radialGradient(listOf(Color(0xFFDCD2FF).copy(alpha = 0.55f), Color(0x00DCD2FF)), c, r), r, c)
+            fun blob(c: Color, x: Float, y: Float, r: Float) =
+                drawCircle(Brush.radialGradient(listOf(c, c.copy(alpha = 0f)), center = Offset(x, y), radius = r), r, Offset(x, y))
+            blob(Color(0xFF8EC5FF).copy(alpha = 0.75f), w * 0.05f, h * 0.06f, w * 0.85f)
+            blob(Color(0xFFC6B6FF).copy(alpha = 0.6f), w * 1.0f, h * 0.22f, w * 0.75f)
+            blob(Color(0xFF9FF0DA).copy(alpha = 0.45f), w * 0.15f, h * 0.62f, w * 0.8f)
+            blob(Color(0xFFFFD1E3).copy(alpha = 0.45f), w * 0.95f, h * 0.85f, w * 0.8f)
         }
         content()
     }
 }
 
-/** Frosted glass: translucent white, bright 1px edge, soft blue shadow. */
+/** Frosted glass: white gradient fill, bright fading edge, soft floating shadow. */
 fun Modifier.glass(radius: Dp = 24.dp, alpha: Float = 0.66f, shadow: Boolean = true): Modifier {
     val shape = RoundedCornerShape(radius)
+    val top = (alpha + 0.14f).coerceAtMost(0.95f)
+    val bottom = (alpha - 0.08f).coerceAtLeast(0.3f)
     return this
-        .then(if (shadow) Modifier.shadow(10.dp, shape, ambientColor = Glass.Shadow.copy(alpha = 0.10f), spotColor = Glass.Shadow.copy(alpha = 0.12f)) else Modifier)
+        .shadow(if (shadow) 10.dp else 4.dp, shape, ambientColor = Color(0xFF1B2B55).copy(alpha = 0.10f), spotColor = Color(0xFF1B2B55).copy(alpha = 0.16f))
         .clip(shape)
-        .background(Color.White.copy(alpha = alpha))
-        .border(1.dp, Glass.Edge, shape)
+        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = top), Color.White.copy(alpha = bottom))))
+        .border(1.dp, Brush.verticalGradient(listOf(Glass.Edge, Color.White.copy(alpha = 0.25f))), shape)
 }
 
 @Composable
@@ -466,7 +466,7 @@ fun SheetFrame(
             .heightIn(max = maxH)
             .shadow(14.dp, shape, ambientColor = Color(0xFF3B609D).copy(alpha = 0.14f), spotColor = Color(0xFF3B609D).copy(alpha = 0.2f))
             .clip(shape)
-            .background(Color(0xEDF7FAFF))
+            .background(Brush.verticalGradient(listOf(Color(0xFFF7F9FD), Color(0xFFEEF2F9))))
             .border(1.dp, Glass.Edge, shape)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
             .imePadding()

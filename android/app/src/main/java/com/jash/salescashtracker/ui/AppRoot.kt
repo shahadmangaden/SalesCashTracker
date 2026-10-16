@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -169,14 +170,15 @@ private fun FloatingNav(state: AppState, modifier: Modifier) {
         Row(
             Modifier.weight(1f).fillMaxHeight()
                 .shadow(14.dp, pill, ambientColor = Color(0xFF3B609D).copy(alpha = 0.14f), spotColor = Color(0xFF3B609D).copy(alpha = 0.22f))
-                .clip(pill).background(Color.White.copy(alpha = 0.72f)).border(1.dp, Glass.Edge, pill).padding(5.dp),
+                .clip(pill).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.92f), Color.White.copy(alpha = 0.80f))))
+                .border(1.dp, Brush.verticalGradient(listOf(Glass.Edge, Color.White.copy(alpha = 0.25f))), pill).padding(5.dp),
             horizontalArrangement = Arrangement.spacedBy(1.dp),
         ) {
             Tab.entries.forEach { t ->
                 val on = state.tab == t
                 Column(
                     Modifier.weight(1f).fillMaxHeight().clip(pill)
-                        .background(if (on) Color(0xB3DCE8FF) else Color.Transparent)
+                        .background(if (on) Color(0x1F0A84FF) else Color.Transparent)
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { state.tab = t },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
@@ -189,7 +191,8 @@ private fun FloatingNav(state: AppState, modifier: Modifier) {
         Box(
             Modifier.size(68.dp)
                 .shadow(14.dp, CircleShape, ambientColor = Color(0xFF3B609D).copy(alpha = 0.14f), spotColor = Color(0xFF246BFD).copy(alpha = 0.35f))
-                .clip(CircleShape).background(Glass.Blue).border(1.dp, Color.White.copy(alpha = 0.56f), CircleShape)
+                .clip(CircleShape).background(Color.White.copy(alpha = 0.85f)).padding(6.dp).clip(CircleShape)
+                .background(Brush.linearGradient(listOf(Color(0xFF3D9BFF), Color(0xFF0A62FF))))
                 .clickable { state.push(Route.QuickAdd) },
             contentAlignment = Alignment.Center,
         ) { Lc(R.drawable.lc_plus, Color.White, 28.dp, description = "Add") }
