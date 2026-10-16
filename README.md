@@ -1,8 +1,20 @@
-# Sales Cash Tracker (Windows)
+# Sales Cash Tracker
 
 Desktop version of the **SAHAD M — Bakhtar Travels Sales & Cash Paid Tracker** Excel workbook.
 
-## Download & install
+Two versions, same features:
+- **Web app** – open in any browser on PC or phone, starts empty, works offline, can be installed to the home screen.
+- **Windows app** – installable .exe.
+
+## Web app
+Every push to `main` builds and deploys the web app with the `Deploy web app` action (GitHub Pages).
+Open the site, then on a phone use the browser menu → **Add to Home screen** (Android) or **Share → Add to Home Screen** (iPhone).
+
+Records are kept in that browser on that device. Use **Lists & Data → Save backup file** regularly; restore it on another device to move your data.
+
+Local preview: `npm install` then `npm run serve:web`.
+
+## Windows app: download & install
 1. Open the **Releases** page of this repository (right side of the repo home page).
 2. Download `SalesCashTracker-Setup-<version>.exe` from the latest release.
 3. Run it. If Windows SmartScreen shows "Windows protected your PC", click **More info → Run anyway** (the app is not code-signed).

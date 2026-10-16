@@ -175,7 +175,19 @@ function render() {
   ({ dashboard: renderDashboard, bookings: renderBookings, cash: renderCash, ledger: renderLedger, expiry: renderExpiry, settings: renderSettings })[ui.view](v);
 }
 
+const IS_WEB = !window.api || window.api.platform === 'web';
+
 function welcomeHTML() {
+  if (IS_WEB) {
+    return `<div class="welcome card">
+    <h2>Welcome to your Sales &amp; Cash Tracker</h2>
+    <p>You're starting fresh. Record each sale or booking as it happens, and log cash paid by agents. Totals, profit, balances, the agent ledger and visa expiry alerts all fill in automatically.</p>
+    <div><button class="btn primary" id="wNew">+ Add first sale</button>
+    <button class="btn" id="wCash">+ Record cash paid</button></div>
+    <p class="muted" style="font-size:12px;margin-top:14px">Your records are saved in this browser on this device. Save a backup file now and then from <b>Lists &amp; Data</b>.<br>
+    Have an existing Excel tracker? <a href="#" id="wImport">Import it</a> · <a href="#" id="wRestore">Restore a backup</a></p>
+  </div>`;
+  }
   return `<div class="welcome card">
     <h2>Welcome to your Sales &amp; Cash Tracker</h2>
     <p>Bring in everything from your Excel tracker in one click — bookings, the cash-paid log, agents and visa types. Or start fresh and add your first sale.</p>
@@ -185,9 +197,10 @@ function welcomeHTML() {
   </div>`;
 }
 function bindWelcome() {
-  $('#wImport').onclick = doImport;
+  $('#wImport').onclick = e => { e.preventDefault(); doImport(); };
   $('#wNew').onclick = () => openBookingForm();
-  $('#wRestore').onclick = doRestore;
+  $('#wRestore').onclick = e => { e.preventDefault(); doRestore(); };
+  if ($('#wCash')) $('#wCash').onclick = () => openCashForm();
 }
 
 // ---------- Dashboard ----------
@@ -623,13 +636,15 @@ async function renderSettings(v) {
   const info = await bridge.info();
   v.innerHTML = `
     <div class="card" style="margin-bottom:14px"><h2>Data</h2>
-      <p class="muted" style="margin-top:0">Everything is saved automatically on this PC. A dated backup copy is kept every day (last 60 days).</p>
+      <p class="muted" style="margin-top:0">${IS_WEB
+        ? 'Everything is saved automatically in this browser on this device, with a snapshot kept each day (last 30 days). Clearing browser data deletes it, so save a backup file regularly. To move to another device, save a backup here and restore it there.'
+        : 'Everything is saved automatically on this PC. A dated backup copy is kept every day (last 60 days).'}</p>
       <div class="data-actions">
         <button class="btn primary" id="sImport">Import Excel tracker</button>
         <button class="btn green" id="sExport">Export to Excel</button>
         <button class="btn" id="sBackup">Save backup file…</button>
         <button class="btn" id="sRestore">Restore from backup…</button>
-        <button class="btn" id="sFolder">Open data folder</button>
+        ${IS_WEB ? '<button class="btn" id="sSnap">Restore daily snapshot…</button>' : '<button class="btn" id="sFolder">Open data folder</button>'}
         <button class="btn danger" id="sWipe" style="margin-left:auto">Delete all records…</button>
       </div>
       <p class="muted" style="font-size:12px;margin-bottom:0">Data file: <span class="path">${esc(info.dataFile)}</span> · App version ${esc(info.version)} · ${data.bookings.length} bookings, ${data.cash.length} cash entries</p>
@@ -654,7 +669,8 @@ async function renderSettings(v) {
   $('#sExport').onclick = doExport;
   $('#sBackup').onclick = async () => { const p = await bridge.saveBackup(data); if (p) toast('Backup saved'); };
   $('#sRestore').onclick = doRestore;
-  $('#sFolder').onclick = () => bridge.openDataFolder();
+  if ($('#sFolder')) $('#sFolder').onclick = () => bridge.openDataFolder();
+  if ($('#sSnap')) $('#sSnap').onclick = doRestoreSnapshot;
   $('#sWipe').onclick = async () => {
     if (await confirmBox('Delete ALL bookings and cash entries?', 'Lists and settings are kept. Tip: save a backup first. Today\'s automatic backup also stays in the data folder.', 'Delete everything')) {
       data.bookings = []; data.cash = []; persist(); render(); toast('All records deleted');
@@ -726,6 +742,22 @@ async function doRestore() {
   data = normalize(d); persist(); go('dashboard'); toast('Backup restored');
 }
 
+async function doRestoreSnapshot() {
+  const dates = bridge.listSnapshots ? await bridge.listSnapshots() : [];
+  if (!dates.length) { toast('No daily snapshots yet', true); return; }
+  openModal(`<div class="modal-head"><h3>Restore daily snapshot</h3><button class="x" data-close>×</button></div>
+    <div class="modal-body"><p class="muted" style="margin-top:0">Each day's last saved state is kept. Pick a day to go back to; your current records will be replaced.</p>
+    <select id="snapPick" style="width:100%">${dates.map(d => `<option value="${d}">${fdate(d)}</option>`).join('')}</select></div>
+    <div class="modal-foot"><button class="btn" data-close>Cancel</button><button class="btn primary" id="snapGo">Restore</button></div>`, true);
+  $('#snapGo').onclick = async () => {
+    const d = await bridge.getSnapshot($('#snapPick').value);
+    closeModal();
+    if (!d) return;
+    if (!(await confirmBox('Restore this snapshot?', `It has ${d.bookings.length} bookings and ${(d.cash || []).length} cash entries. Current records will be replaced.`, 'Restore'))) return;
+    data = normalize(d); persist(); go('dashboard'); toast('Snapshot restored');
+  };
+}
+
 // ---------- Modal helpers ----------
 function openModal(html, narrow) {
   const m = $('#modal');
@@ -765,12 +797,13 @@ function normalize(d) {
 async function boot() {
   data = normalize(await bridge.load());
   const info = await bridge.info();
-  $('#sideFoot').innerHTML = `v${esc(info.version)} · Ctrl+N new sale<br>Data saves automatically`;
+  $('#sideFoot').innerHTML = `${IS_WEB ? 'Web' : 'Desktop'} v${esc(info.version)} · Ctrl+N new sale<br>Data saves automatically`;
   $$('#nav button').forEach(b => b.onclick = () => go(b.dataset.view));
   $('#monthFilter').onchange = e => { ui.month = e.target.value; render(); };
   $('#search').oninput = e => { ui.search = e.target.value; render(); $('#search').focus(); };
   $('#sideAddBooking').onclick = () => openBookingForm();
   $('#sideAddCash').onclick = () => openCashForm();
+  $('#fab').onclick = () => (ui.view === 'cash' ? openCashForm() : openBookingForm());
   go('dashboard');
 }
 boot();
