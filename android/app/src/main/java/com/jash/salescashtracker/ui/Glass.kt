@@ -3,6 +3,11 @@ package com.jash.salescashtracker.ui
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -168,7 +173,8 @@ fun Modifier.glass(radius: Dp = 24.dp, alpha: Float = 0.66f, shadow: Boolean = t
     val top = (alpha + 0.14f).coerceAtMost(0.95f)
     val bottom = (alpha - 0.08f).coerceAtLeast(0.3f)
     return this
-        .shadow(if (shadow) 10.dp else 4.dp, shape, ambientColor = Color(0xFF1B2B55).copy(alpha = 0.10f), spotColor = Color(0xFF1B2B55).copy(alpha = 0.16f))
+        // Soft raised depth (white highlight + navy shade) from the reference designs
+        .softShadow(radius, if (shadow) 5.dp else 3.dp, if (shadow) 14.dp else 8.dp, if (shadow) 0.10f else 0.06f, if (shadow) 0.65f else 0.45f)
         .clip(shape)
         .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = top), Color.White.copy(alpha = bottom))))
         .border(1.dp, Brush.verticalGradient(listOf(Glass.Edge, Color.White.copy(alpha = 0.25f))), shape)
@@ -456,6 +462,7 @@ fun SheetFrame(
     title: String,
     onClose: () -> Unit,
     spacing: Dp = 10.dp,
+    footer: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val maxH = (LocalConfiguration.current.screenHeightDp * 0.9f).dp
@@ -484,9 +491,134 @@ fun SheetFrame(
         }
         Spacer(Modifier.height(spacing))
         Column(
-            Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 22.dp),
+            Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
+                .then(if (footer == null) Modifier.navigationBarsPadding() else Modifier).padding(bottom = if (footer == null) 22.dp else 12.dp),
             verticalArrangement = Arrangement.spacedBy(spacing),
             content = content,
         )
+        if (footer != null) {
+            // Pinned action bar: the Save button is always visible, the form scrolls behind it
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(top = 6.dp, bottom = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                content = footer,
+            )
+        }
+    }
+}
+
+// ---------- Soft (neumorphic) depth ----------
+
+/** Two soft shadows - a white highlight top-left and a navy shade bottom-right - for a raised, touchable feel. */
+fun Modifier.softShadow(radius: Dp, offset: Dp = 6.dp, blur: Dp = 12.dp, darkAlpha: Float = 0.16f, lightAlpha: Float = 0.9f): Modifier =
+    this.drawBehind {
+        val r = radius.toPx(); val o = offset.toPx(); val b = blur.toPx()
+        drawIntoCanvas { canvas ->
+            val paint = Paint().asFrameworkPaint().apply {
+                isAntiAlias = true
+                maskFilter = android.graphics.BlurMaskFilter(b, android.graphics.BlurMaskFilter.Blur.NORMAL)
+            }
+            paint.color = android.graphics.Color.argb((darkAlpha * 255).toInt(), 0x0D, 0x27, 0x50)
+            canvas.nativeCanvas.drawRoundRect(o, o, size.width + o, size.height + o, r, r, paint)
+            paint.color = android.graphics.Color.argb((lightAlpha * 255).toInt(), 255, 255, 255)
+            canvas.nativeCanvas.drawRoundRect(-o, -o, size.width - o, size.height - o, r, r, paint)
+        }
+    }
+
+private val Raised = Brush.linearGradient(listOf(Color(0xFF3D9BFF), Color(0xFF0A62FF)))
+
+// ---------- Date strip (pick a day like a calendar row) ----------
+
+private val stripDay = java.time.format.DateTimeFormatter.ofPattern("EEE", java.util.Locale.ENGLISH)
+
+/** Last two weeks as tappable day pills (today on the right) plus a calendar button for older dates. */
+@Composable
+fun DateStrip(selected: String, onSelect: (String) -> Unit, onPickOlder: () -> Unit) {
+    val today = java.time.LocalDate.now()
+    val sel = runCatching { java.time.LocalDate.parse(selected.take(10)) }.getOrNull() ?: today
+    val days = (13 downTo 0).map { today.minusDays(it.toLong()) }.let { if (sel !in it) listOf(sel) + it else it }
+    val scroll = rememberScrollState()
+    androidx.compose.runtime.LaunchedEffect(Unit) { scroll.scrollTo(scroll.maxValue) }
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(scroll).padding(vertical = 8.dp, horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val pill = RoundedCornerShape(26.dp)
+        Box(
+            Modifier.size(width = 52.dp, height = 68.dp).softShadow(26.dp, 4.dp, 10.dp, 0.12f).clip(pill)
+                .background(Color.White.copy(alpha = 0.9f)).border(1.dp, Glass.Edge, pill).clickable(onClick = onPickOlder),
+            contentAlignment = Alignment.Center,
+        ) { Lc(R.drawable.lc_calendar, Glass.Blue, 22.dp, description = "Pick an older date") }
+        days.forEach { d ->
+            val on = d == sel
+            Column(
+                Modifier.size(width = 52.dp, height = if (on) 76.dp else 68.dp)
+                    .softShadow(26.dp, if (on) 6.dp else 4.dp, 12.dp, if (on) 0.22f else 0.10f)
+                    .clip(pill)
+                    .background(if (on) Raised else Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.75f))))
+                    .border(1.dp, if (on) Color.White.copy(alpha = 0.5f) else Glass.Edge, pill)
+                    .clickable { onSelect(d.toString()) },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+            ) {
+                T(d.dayOfMonth.toString(), 20.sp, if (on) Color.White else Glass.Ink, FontWeight.Bold)
+                T(if (d == today) "Today" else d.format(stripDay), 10.sp, if (on) Color.White.copy(alpha = 0.9f) else Glass.Muted, FontWeight.Medium)
+            }
+        }
+    }
+}
+
+// ---------- Product tiles ----------
+
+/** Products as raised icon tiles, three per row. */
+@Composable
+fun ProductGrid(options: List<String>, selected: String, onSelect: (String) -> Unit, extra: (@Composable (Modifier) -> Unit)? = null) {
+    val cells: List<String?> = options + (if (extra != null) listOf(null) else emptyList())
+    Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        cells.chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { o ->
+                    val m = Modifier.weight(1f).heightIn(min = 84.dp)
+                    if (o == null) extra?.invoke(m) else {
+                        val on = o == selected
+                        val shape = RoundedCornerShape(20.dp)
+                        Column(
+                            m.softShadow(20.dp, if (on) 6.dp else 4.dp, 12.dp, if (on) 0.22f else 0.10f).clip(shape)
+                                .background(if (on) Raised else Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.72f))))
+                                .border(1.dp, if (on) Color.White.copy(alpha = 0.5f) else Glass.Edge, shape)
+                                .clickable { onSelect(o) }.padding(horizontal = 6.dp, vertical = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+                        ) {
+                            Box(
+                                Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(if (on) Color.White.copy(alpha = 0.22f) else Glass.TileBg),
+                                contentAlignment = Alignment.Center,
+                            ) { Lc(productIcon(o), if (on) Color.White else Glass.Blue, 20.dp) }
+                            T(sentence(o), 11.sp, if (on) Color.White else Glass.Ink, FontWeight.SemiBold, maxLines = 2, align = TextAlign.Center)
+                        }
+                    }
+                }
+                repeat(3 - row.size) { Box(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/** Primary button with the raised blue gradient and soft depth. */
+@Composable
+fun SubmitButton(text: String, @DrawableRes icon: Int?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(100.dp)
+    Row(
+        modifier.fillMaxWidth().heightIn(min = 56.dp).softShadow(100.dp, 6.dp, 16.dp, 0.25f, 0.8f).clip(shape).background(Raised)
+            .border(1.dp, Color.White.copy(alpha = 0.45f), shape).clickable(onClick = onClick).padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Box(Modifier.size(28.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) { Lc(icon, Color.White, 18.dp) }
+            Spacer(Modifier.width(10.dp))
+        }
+        T(text, 17.sp, Color.White, FontWeight.Bold)
     }
 }

@@ -118,7 +118,7 @@ export function createSync(base, backend) {
         if (ch.id !== META_ID) continue;
         if ((r._ts || 0) > (d._metaTs || 0)) {
           if (r.settings) d.settings = r.settings;
-          if (r.lists) d.lists = { ...d.lists, ...r.lists };
+          if (r.lists) { d.lists = { ...d.lists }; Object.entries(r.lists).forEach(([k, v]) => { if (!Array.isArray(v) || v.length) d.lists[k] = v; }); }
           d._metaTs = r._ts;
           changed = true;
         }

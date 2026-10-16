@@ -945,7 +945,9 @@ document.addEventListener('keydown', e => {
 function normalize(d) {
   const base = emptyData();
   d = d || {};
-  const out = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) }, lists: { ...base.lists, ...(d.lists || {}) } };
+  const out = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) }, lists: { ...base.lists } };
+  // Keep built-in choices when a synced list is missing or empty
+  Object.entries(d.lists || {}).forEach(([k, v]) => { if (!Array.isArray(v) || v.length) out.lists[k] = v; });
   out.bookings = Array.isArray(d.bookings) ? d.bookings : [];
   out.cash = Array.isArray(d.cash) ? d.cash : [];
   out.bookings.forEach(b => { if (!b.id) b.id = uid(); });

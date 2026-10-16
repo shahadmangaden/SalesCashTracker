@@ -159,13 +159,14 @@ data class Lists(
         fun fromMap(m: Map<String, Any?>?): Lists {
             val d = Lists()
             if (m == null) return d
+            // An empty or missing list falls back to the built-in choices
             fun strList(key: String, def: List<String>): List<String> =
-                (m[key] as? List<*>)?.mapNotNull { it as? String } ?: def
+                (m[key] as? List<*>)?.mapNotNull { it as? String }?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() } ?: def
             val docs = (m["docTypes"] as? List<*>)?.mapNotNull { item ->
                 val x = item as? Map<String, Any?> ?: return@mapNotNull null
                 val name = x["name"] as? String ?: return@mapNotNull null
                 DocType(name, (x["days"] as? Number)?.toInt())
-            } ?: d.docTypes
+            }?.takeIf { it.isNotEmpty() } ?: d.docTypes
             return Lists(
                 agents = strList("agents", d.agents),
                 customerTypes = strList("customerTypes", d.customerTypes),
@@ -274,3 +275,21 @@ fun Booking.statusWith(due: Double): String {
         else -> if (st == "PAID" || st == "PARTIAL") "PENDING" else st.ifBlank { "PENDING" }
     }
 }
+
+
+/** Built-in sub-products shown after picking a product. Saved in the sale's "detail" field. */
+val SUB_PRODUCTS: Map<String, List<String>> = mapOf(
+    "FLIGHT TICKET" to listOf("ONE WAY", "RETURN", "MULTI CITY", "DATE CHANGE", "REISSUE", "REFUND"),
+    "VISA SERVICE" to listOf("30 DAYS TOURIST", "60 DAYS TOURIST", "90 DAYS TOURIST", "VISA EXTENSION", "STATUS CHANGE", "VISA CANCELLATION"),
+    "VISA CHANGE BY BUS" to listOf("OMAN EXIT", "OMAN RETURN", "BUS + 30 DAYS VISA", "BUS + 60 DAYS VISA"),
+    "KSA MULTIPPLE ENTRY" to listOf("1 YEAR MULTIPLE", "SINGLE ENTRY", "UMRAH VISA", "TRANSIT VISA"),
+    "TYPING CENTER / DOCUMENT SERVICE" to listOf("EMIRATES ID", "MEDICAL", "ATTESTATION", "TRANSLATION", "TYPING", "LABOUR / MOHRE"),
+    "HOTEL" to listOf("1 NIGHT", "2 NIGHTS", "3 NIGHTS", "WEEK STAY", "MAKKAH", "MADINAH"),
+    "TOUR PACKAGE" to listOf("DESERT SAFARI", "CITY TOUR", "DHOW CRUISE", "INTERNATIONAL PACKAGE", "THEME PARK"),
+    "GLOBAL VISA" to listOf("SCHENGEN", "UK", "USA", "CANADA", "TURKEY", "GEORGIA", "AZERBAIJAN", "THAILAND"),
+    "UMRAH PACKAGE" to listOf("UMRAH BY BUS", "UMRAH BY FLIGHT", "VISA ONLY", "VISA + HOTEL", "FULL PACKAGE"),
+    "HAJJ PACKAGE" to listOf("ECONOMY", "STANDARD", "PREMIUM"),
+    "CAR RENTAL" to listOf("DAILY", "WEEKLY", "MONTHLY", "WITH DRIVER"),
+    "INSURANCE" to listOf("TRAVEL INSURANCE", "HEALTH INSURANCE", "VISA INSURANCE", "CAR INSURANCE"),
+    "OTHER" to listOf("SERVICE CHARGE", "COURIER", "MISC"),
+)

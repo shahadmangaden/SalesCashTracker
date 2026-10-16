@@ -3,6 +3,7 @@ package com.jash.salescashtracker.ui
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,6 +50,7 @@ import com.jash.salescashtracker.R
 import com.jash.salescashtracker.data.Booking
 import com.jash.salescashtracker.data.CashEntry
 import com.jash.salescashtracker.data.Repository
+import com.jash.salescashtracker.data.SUB_PRODUCTS
 import com.jash.salescashtracker.ui.theme.Inter
 import java.time.Instant
 import java.time.LocalDate
@@ -97,12 +99,7 @@ fun DateChoices(label: String, iso: String, onChange: (String) -> Unit) {
     val yesterday = LocalDate.now().minusDays(1).toString()
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         FieldLabel("$label · ${labelDate(iso)}")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Choice("Today", iso == today, { onChange(today) })
-            Choice("Yesterday", iso == yesterday, { onChange(yesterday) })
-            val other = iso != today && iso != yesterday && iso.isNotBlank()
-            Choice(if (other) labelDate(iso) else "Pick date", other, { open = true })
-        }
+        DateStrip(iso, onChange) { open = true }
     }
     if (open) {
         val initial = runCatching { LocalDate.parse(iso.take(10)) }.getOrNull() ?: LocalDate.now()
@@ -202,6 +199,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
     var showMore by remember { mutableStateOf(hasDetails) }
     var addAgent by remember { mutableStateOf(false) }
     var allProducts by remember { mutableStateOf(false) }
+    var otherSub by remember { mutableStateOf(false) }
     var allModes by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -231,7 +229,11 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
         else state.pop()
     }
 
-    SheetFrame(if (existing) "Edit sale" else "New sale", onClose = { state.pop() }) {
+    SheetFrame(if (existing) "Edit sale" else "New sale", onClose = { state.pop() }, footer = {
+        ErrorText(error)
+        SubmitButton(if (existing) "Save changes" else "Save sale", R.drawable.lc_check, { save(false) })
+        if (!existing) TextAction("Save & add another") { save(true) }
+    }) {
         ErrorText(error)
         DateChoices("Sale date", date) { date = it }
 
@@ -245,9 +247,29 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
         if (addAgent) GlassInput(null, agent, { agent = it }, placeholder = "New agent name", caps = KeyboardCapitalization.Characters)
 
         val productOptions = if (allProducts) lists.categories else
-            ranked(all.map { it.category }, lists.categories, 6).let { if (category.isNotBlank() && category !in it) listOf(category) + it else it }
-        ChoiceGroup("Product", productOptions, category, { category = it }) {
-            if (lists.categories.size > productOptions.size || allProducts) Choice(if (allProducts) "Less" else "More…", false, { allProducts = !allProducts })
+            ranked(all.map { it.category }, lists.categories, 5).let { if (category.isNotBlank() && category !in it) listOf(category) + it else it }
+        FieldLabel("Product")
+        ProductGrid(productOptions, category, { if (category != it) { category = it; detail = ""; otherSub = false } }) { m ->
+            val shape = RoundedCornerShape(20.dp)
+            Column(
+                m.clip(shape).background(Color.White.copy(alpha = 0.5f)).border(1.dp, Glass.Edge, shape).clickable { allProducts = !allProducts }.padding(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+            ) {
+                Lc(if (allProducts) R.drawable.lc_chevron_down else R.drawable.lc_plus, Glass.Blue, 22.dp, if (allProducts) Modifier.rotate(180f) else Modifier)
+                T(if (allProducts) "Fewer" else "All products", 11.sp, Glass.Blue, FontWeight.SemiBold)
+            }
+        }
+
+        // Sub-product (stored in the sale's detail field)
+        if (category.isNotBlank()) {
+            val used = all.filter { it.category == category }.map { it.detail }
+            val subs = ranked(used, SUB_PRODUCTS[category.uppercase()] ?: emptyList(), 8)
+                .let { if (detail.isNotBlank() && detail !in it && !otherSub) listOf(detail) + it else it }
+            ChoiceGroup("${sentence(category)} · type", subs, detail, { detail = if (detail == it) "" else it; otherSub = false }) {
+                Choice("+ Other", otherSub, { otherSub = !otherSub; if (otherSub) detail = "" })
+            }
+            if (otherSub) GlassInput(null, detail, { detail = it }, placeholder = "Type the service, e.g. DXB-COK RETURN", caps = KeyboardCapitalization.Characters)
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -323,10 +345,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
             }
         }
 
-        ErrorText(error)
-        PrimaryButton(if (existing) "Save changes" else "Save sale", R.drawable.lc_check, { save(false) })
-        if (!existing) TextAction("Save & add another") { save(true) }
-        else {
+        if (existing) {
             TextAction("Duplicate as new sale") {
                 state.replaceTop(Route.EditSale(build().copy(id = UUID.randomUUID().toString(), customer = "", pnr = "", contact = "", createdAt = ""), isCopy = true))
             }
@@ -376,7 +395,10 @@ fun CashSheet(original: CashEntry?, state: AppState) {
         if (again) state.replaceTop(Route.EditCash(CashEntry(date = date, agent = agent.trim().uppercase(), mode = mode))) else state.pop()
     }
 
-    SheetFrame(if (existing) "Edit payment" else "Cash paid", onClose = { state.pop() }, spacing = 16.dp) {
+    SheetFrame(if (existing) "Edit payment" else "Cash paid", onClose = { state.pop() }, spacing = 16.dp, footer = {
+        SubmitButton(if (existing) "Save changes" else "Save payment", R.drawable.lc_check, { save(false) })
+        if (!existing) TextAction("Save & add another") { save(true) }
+    }) {
         Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
             T("AMOUNT · $code", 12.sp, Glass.Muted)
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
@@ -409,11 +431,7 @@ fun CashSheet(original: CashEntry?, state: AppState) {
         GlassInput("Remarks · optional", remarks, { remarks = it }, placeholder = "Receipt no., note…", icon = R.drawable.lc_pencil_line,
             caps = KeyboardCapitalization.Sentences)
 
-        Column {
-            PrimaryButton(if (existing) "Save changes" else "Save payment", R.drawable.lc_check, { save(false) })
-            if (!existing) TextAction("Save & add another") { save(true) }
-            else TextAction("Delete payment", Glass.Red) { confirmDelete = true }
-        }
+        if (existing) TextAction("Delete payment", Glass.Red) { confirmDelete = true }
     }
 
     if (confirmDelete) {
