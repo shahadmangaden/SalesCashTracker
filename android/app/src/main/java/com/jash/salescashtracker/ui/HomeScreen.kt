@@ -95,8 +95,8 @@ fun HomeScreen(state: AppState) {
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    T(if (firstName.isNotBlank()) "$greet, $firstName" else greet, 13.sp, Glass.Muted)
-                    T("Your overview", 30.sp, Glass.Ink, FontWeight.Bold)
+                    T(if (firstName.isNotBlank()) "$greet, $firstName" else greet, 13.sp, Glass.OnBgMuted)
+                    T("Your overview", 30.sp, Glass.OnBg, FontWeight.Bold)
                 }
                 PeriodChip(state)
             }
@@ -108,17 +108,17 @@ fun HomeScreen(state: AppState) {
             val shape = RoundedCornerShape(28.dp)
             Column(
                 Modifier.fillMaxWidth().softShadow(28.dp, 8.dp, 20.dp, 0.25f, 0.7f).clip(shape)
-                    .background(Brush.linearGradient(listOf(Color(0xFF2A2A2E), Color(0xFF18181B))))
+                    .background(Brush.linearGradient(listOf(Glass.HeroTop, Glass.HeroBottom)))
                     .clickable { state.tab = Tab.Reports }.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        T("Total sales · $code", 13.sp, Color.White.copy(alpha = 0.65f), FontWeight.SemiBold)
-                        T(amt(t.sales), 38.sp, Color.White, FontWeight.Bold)
+                        T("Total sales · $code", 13.sp, Glass.HeroMuted, FontWeight.SemiBold)
+                        T(amt(t.sales), 38.sp, Glass.HeroText, FontWeight.Bold)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             T("Profit ${cur(t.profit, code)}", 12.sp, Glass.Yellow, FontWeight.SemiBold)
-                            if (growth != null) StatusPill(if (growth >= 0) "↗ ${pct(growth)}" else "↘ ${pct(-growth)}", Glass.Ink, Glass.Yellow, 10.sp)
+                            if (growth != null) StatusPill(if (growth >= 0) "↗ ${pct(growth)}" else "↘ ${pct(-growth)}", Glass.OnAccent, Glass.Yellow, 10.sp)
                         }
                     }
                     Box(Modifier.size(78.dp), contentAlignment = Alignment.Center) {
@@ -126,13 +126,13 @@ fun HomeScreen(state: AppState) {
                             val sw = 8.dp.toPx()
                             val tl = androidx.compose.ui.geometry.Offset(sw / 2, sw / 2)
                             val sz = androidx.compose.ui.geometry.Size(size.width - sw, size.height - sw)
-                            drawArc(Color.White.copy(alpha = 0.14f), -90f, 360f, false, tl, sz, style = androidx.compose.ui.graphics.drawscope.Stroke(sw))
+                            drawArc(Glass.HeroTrack, -90f, 360f, false, tl, sz, style = androidx.compose.ui.graphics.drawscope.Stroke(sw))
                             drawArc(Glass.Yellow, -90f, (360f * collected).toFloat(), false, tl, sz,
                                 style = androidx.compose.ui.graphics.drawscope.Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round))
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            T("${Math.round(collected * 100)}%", 16.sp, Color.White, FontWeight.Bold)
-                            T("collected", 9.sp, Color.White.copy(alpha = 0.6f))
+                            T("${Math.round(collected * 100)}%", 16.sp, Glass.HeroText, FontWeight.Bold)
+                            T("collected", 9.sp, Glass.HeroMuted)
                         }
                     }
                 }

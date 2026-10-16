@@ -18,6 +18,7 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
+        com.jash.salescashtracker.ui.ThemeState.load(this)
         setContent {
             SalesTheme {
                 AppRoot()

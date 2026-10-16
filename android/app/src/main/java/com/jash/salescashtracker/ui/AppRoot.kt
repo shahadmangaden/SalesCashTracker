@@ -13,6 +13,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -97,6 +99,14 @@ class AppState {
 
 @Composable
 fun AppRoot() {
+    val view = androidx.compose.ui.platform.LocalView.current
+    val dark = ThemeState.palette.darkBg
+    val user0 by Repository.user.collectAsStateWithLifecycle()
+    androidx.compose.runtime.SideEffect {
+        val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+        // Light icons over the crimson backdrop, dark icons elsewhere (the sign-in screen is always light)
+        androidx.core.view.WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !(dark && user0 != null)
+    }
     val user by Repository.user.collectAsStateWithLifecycle()
     val sync by Repository.sync.collectAsStateWithLifecycle()
     when {
@@ -183,8 +193,8 @@ private fun FloatingNav(state: AppState, modifier: Modifier) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
                 ) {
-                    Lc(t.icon, if (on) Glass.Ink else Glass.Muted, 21.dp, description = t.label)
-                    T(t.label, 9.sp, if (on) Glass.Ink else Glass.Muted, if (on) FontWeight.Bold else FontWeight.Medium)
+                    Lc(t.icon, if (on) Glass.OnAccent else Glass.Muted, 21.dp, description = t.label)
+                    T(t.label, 9.sp, if (on) Glass.OnAccent else Glass.Muted, if (on) FontWeight.Bold else FontWeight.Medium)
                 }
             }
         }
@@ -192,32 +202,65 @@ private fun FloatingNav(state: AppState, modifier: Modifier) {
             Modifier.size(68.dp)
                 .shadow(14.dp, CircleShape, ambientColor = Color(0xFF3B609D).copy(alpha = 0.14f), spotColor = Color(0xFF1F1F22).copy(alpha = 0.35f))
                 .clip(CircleShape).background(Color.White.copy(alpha = 0.85f)).padding(6.dp).clip(CircleShape)
-                .background(Brush.linearGradient(listOf(Color(0xFFF8D25A), Color(0xFFF2BE2E))))
+                .background(Brush.linearGradient(listOf(Glass.Yellow, Glass.Accent2)))
                 .clickable { state.push(Route.QuickAdd) },
             contentAlignment = Alignment.Center,
-        ) { Lc(R.drawable.lc_plus, Glass.Ink, 28.dp, description = "Add") }
+        ) { Lc(R.drawable.lc_plus, Glass.OnAccent, 28.dp, description = "Add") }
     }
 }
 
 /** Month chip with a picker menu ("Oct 2026 ⌄"). */
 @Composable
 fun PeriodChip(state: AppState, long: Boolean = false) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Choice((if (long) state.periodLong else state.periodShort) + " ⌄", false, { open = true }, large = long)
+        MonthMenu(state, open) { open = false }
+    }
+}
+
+/** Themed month picker: rounded white card, months grouped by year, current choice highlighted. */
+@Composable
+fun MonthMenu(state: AppState, open: Boolean, onDismiss: () -> Unit) {
     val bookings by Repository.bookings.collectAsStateWithLifecycle()
     val cash by Repository.cash.collectAsStateWithLifecycle()
-    var open by remember { mutableStateOf(false) }
     val months = remember(bookings, cash) {
         (bookings.map { it.date.take(7) } + cash.map { it.date.take(7) } + LocalDate.now().toString().take(7))
             .filter { it.length == 7 }.distinct().sortedDescending()
     }
-    Box {
-        Choice((if (long) state.periodLong else state.periodShort) + " ⌄", false, { open = true }, large = long)
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(text = { Text("All time") }, onClick = { state.month = "all"; open = false })
-            months.forEach { m ->
-                val label = runCatching { YearMonth.parse(m).format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)) }.getOrDefault(m)
-                DropdownMenuItem(text = { Text(label) }, onClick = { state.month = m; open = false })
-            }
+    DropdownMenu(
+        expanded = open, onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(22.dp), containerColor = Color.White, shadowElevation = 12.dp,
+        modifier = Modifier.width(230.dp),
+    ) {
+        T("Show figures for", 11.sp, Glass.Muted, FontWeight.SemiBold, Modifier.padding(start = 16.dp, top = 4.dp, bottom = 6.dp))
+        MonthItem("All time", "Every month", state.month == "all") { state.month = "all"; onDismiss() }
+        months.forEach { m ->
+            val ym = runCatching { YearMonth.parse(m) }.getOrNull()
+            val label = ym?.format(DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH)) ?: m
+            val sub = (ym?.year?.toString() ?: "") + if (ym == YearMonth.now()) " · this month" else ""
+            MonthItem(label, sub, state.month == m) { state.month = m; onDismiss() }
         }
+    }
+}
+
+@Composable
+private fun MonthItem(title: String, sub: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp).clip(RoundedCornerShape(14.dp))
+            .background(if (selected) Glass.YellowSoft else Color.Transparent).clickable(onClick = onClick)
+            .heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(32.dp).clip(CircleShape).background(if (selected) Glass.Yellow else Glass.TileBg), contentAlignment = Alignment.Center) {
+            Lc(R.drawable.lc_calendar, if (selected) Glass.OnAccent else Glass.Muted, 16.dp)
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            T(title, 14.sp, Glass.Ink, if (selected) FontWeight.Bold else FontWeight.Medium)
+            if (sub.isNotBlank()) T(sub, 11.sp, Glass.Muted)
+        }
+        if (selected) Lc(R.drawable.lc_check, Glass.Ink, 16.dp)
     }
 }
 

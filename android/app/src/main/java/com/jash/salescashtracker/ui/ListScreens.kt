@@ -72,22 +72,10 @@ fun GlassSearch(value: String, onChange: (String) -> Unit, placeholder: String) 
 /** Heading action that opens the month picker. */
 @Composable
 fun PeriodMenuButton(state: AppState, @DrawableRes icon: Int) {
-    val bookings by Repository.bookings.collectAsStateWithLifecycle()
-    val cash by Repository.cash.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf(false) }
-    val months = remember(bookings, cash) {
-        (bookings.map { it.date.take(7) } + cash.map { it.date.take(7) } + LocalDate.now().toString().take(7))
-            .filter { it.length == 7 }.distinct().sortedDescending()
-    }
     Box {
         HeadingAction(icon, { open = true }, "Choose month")
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(text = { Text("All time", fontWeight = if (state.month == "all") FontWeight.Bold else null) }, onClick = { state.month = "all"; open = false })
-            months.forEach { m ->
-                val label = runCatching { YearMonth.parse(m).format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)) }.getOrDefault(m)
-                DropdownMenuItem(text = { Text(label, fontWeight = if (state.month == m) FontWeight.Bold else null) }, onClick = { state.month = m; open = false })
-            }
-        }
+        MonthMenu(state, open) { open = false }
     }
 }
 
@@ -110,8 +98,8 @@ fun dayLabel(iso: String): String = runCatching {
 @Composable
 private fun DayHeader(day: String, total: String) {
     Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        T(dayLabel(day), 12.sp, Glass.Muted, FontWeight.SemiBold, Modifier.weight(1f))
-        T(total, 11.sp, Glass.Muted)
+        T(dayLabel(day), 12.sp, Glass.OnBgMuted, FontWeight.SemiBold, Modifier.weight(1f))
+        T(total, 11.sp, Glass.OnBgMuted)
     }
 }
 
@@ -229,8 +217,8 @@ fun CashScreen(state: AppState) {
         item { GlassSearch(search, { search = it }, "Search agent, mode or remarks") }
         item {
             Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                T("Recent payments", 13.sp, Glass.Ink, FontWeight.SemiBold, Modifier.weight(1f))
-                T("Add payment", 12.sp, Glass.Blue, modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { state.push(Route.EditCash(null)) })
+                T("Recent payments", 13.sp, Glass.OnBg, FontWeight.SemiBold, Modifier.weight(1f))
+                T("Add payment", 12.sp, Glass.OnBg, modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { state.push(Route.EditCash(null)) })
             }
         }
         if (rows.isEmpty()) item {

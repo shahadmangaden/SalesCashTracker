@@ -91,7 +91,7 @@ fun AuthScreen() {
         }
     }
 
-    GlassBackground {
+    GlassBackground(forceLight = true) {
         Column(
             Modifier.fillMaxSize().systemBarsPadding().imePadding().verticalScroll(rememberScrollState())
                 .padding(start = 28.dp, end = 28.dp, top = 42.dp, bottom = 16.dp),

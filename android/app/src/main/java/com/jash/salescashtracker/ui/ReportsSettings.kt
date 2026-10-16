@@ -87,7 +87,7 @@ fun ReportsScreen(state: AppState) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) { PeriodChip(state, long = true) }
-                T(range, 12.sp, Glass.Muted)
+                T(range, 12.sp, Glass.OnBgMuted)
             }
         }
         item {
@@ -357,17 +357,21 @@ fun SettingsScreen(state: AppState) {
             GlassCard(padding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
                 SettingRow(R.drawable.lc_building_2, "Business details",
                     listOf(nice(settings.company), nice(settings.user), settings.currency.ifBlank { "AED" }).filter { it.isNotBlank() }.joinToString(" · "), true) { dialog = "business" }
+                SettingRow(R.drawable.lc_palette, "Theme", ThemeState.palette.name, true) { dialog = "theme" }
                 SettingRow(R.drawable.lc_file_down, "Export to Excel", "Sales & cash paid", true) { exportCsv(ctx, bookings, cash, lists) }
                 SettingRow(R.drawable.lc_cloud_check, "Backup & restore", "${bookings.size} sales · ${cash.size} payments", false) { dialog = "backup" }
             }
         }
         item {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (syncLine.isNotEmpty()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (syncLine.isNotEmpty()) Row(
+                    Modifier.clip(RoundedCornerShape(100.dp)).background(Color.White.copy(alpha = 0.9f)).padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Lc(if (sync == SyncState.Synced) R.drawable.lc_circle_check else if (sync == SyncState.Offline) R.drawable.lc_cloud_off else R.drawable.lc_refresh_cw, syncColor, 14.dp)
                     T(syncLine, 11.sp, syncColor)
                 }
-                T("Version ${BuildConfig.VERSION_NAME}", 12.sp, Glass.Muted, align = TextAlign.Center)
+                T("Version ${BuildConfig.VERSION_NAME}", 12.sp, Glass.OnBgMuted, align = TextAlign.Center)
             }
         }
         item { TabBarSpacer() }
@@ -431,6 +435,36 @@ fun SettingsScreen(state: AppState) {
             dismissButton = {
                 TextButton(onClick = { dialog = null; picker.launch(arrayOf("application/json", "text/plain", "*/*")) }) { Text("Restore from file") }
             },
+        )
+        "theme" -> AlertDialog(
+            onDismissRequest = { dialog = null },
+            containerColor = Color.White,
+            title = { Text("Theme") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Palettes.forEach { pal ->
+                        val on = ThemeState.palette.id == pal.id
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                                .border(if (on) 2.dp else 1.dp, if (on) pal.primary else Glass.Divider, RoundedCornerShape(16.dp))
+                                .clickable { ThemeState.set(ctx, pal); dialog = null }.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            // little preview: backdrop, card and accent
+                            Box(Modifier.size(width = 54.dp, height = 40.dp).clip(RoundedCornerShape(10.dp))
+                                .background(androidx.compose.ui.graphics.Brush.verticalGradient(pal.bg)), contentAlignment = Alignment.Center) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Box(Modifier.size(width = 18.dp, height = 22.dp).clip(RoundedCornerShape(5.dp)).background(Color.White))
+                                    Box(Modifier.size(14.dp).clip(CircleShape).background(pal.accent))
+                                }
+                            }
+                            Text(pal.name, modifier = Modifier.weight(1f), fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+                            if (on) Lc(R.drawable.lc_check, pal.primary, 18.dp)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { dialog = null }) { Text("Done") } },
         )
         "help" -> AlertDialog(
             onDismissRequest = { dialog = null },
