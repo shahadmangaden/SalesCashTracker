@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -35,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -42,6 +46,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
@@ -231,21 +236,22 @@ private fun Header(
             ) { T(initials(user.ifBlank { "Me" }), 15.sp, pal.accent, FontWeight.Bold) }
         }
 
-        // Folder tabs + progress card
-        Column {
-            Row(verticalAlignment = Alignment.Bottom) {
-                FolderTab("Today", todayCount.toString(), scope == "today") { onScope("today") }
-                Box {
-                    FolderTab("$monthLabel ⌄", monthCount.toString(), scope == "month") {
-                        if (scope == "month") monthMenu = true else onScope("month")
-                    }
-                    MonthMenu(state, monthMenu) { monthMenu = false; onScope("month") }
-                }
-            }
+        // Floating segmented pill: Today | month
+        Box {
+            SegmentedPill(
+                listOf(Triple("today", "Today", todayCount.toString()), Triple("month", "$monthLabel ⌄", monthCount.toString())),
+                scope,
+            ) { key -> if (key == "month" && scope == "month") monthMenu = true else onScope(key) }
+            Box(Modifier.align(Alignment.TopEnd)) { MonthMenu(state, monthMenu) { monthMenu = false; onScope("month") } }
+        }
+
+        // One plain rounded metrics card
+        run {
             val first = scope == "today"
             Column(
                 Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = if (first) 0.dp else 22.dp, topEnd = 22.dp, bottomStart = 22.dp, bottomEnd = 22.dp))
+                    .shadow(10.dp, RoundedCornerShape(24.dp), ambientColor = pal.shadow.copy(alpha = 0.10f), spotColor = pal.shadow.copy(alpha = 0.16f))
+                    .clip(RoundedCornerShape(24.dp))
                     .background(pal.card).clickable { state.reportsPage = "agents"; state.tab = Tab.Reports }
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -275,21 +281,44 @@ private fun Header(
     }
 }
 
-/** A folder tab on the accent header: the selected one joins the white card below it. */
+/** Segmented switch on the accent header: a translucent track with a card-coloured thumb that slides to the chosen option. */
 @Composable
-private fun FolderTab(label: String, count: String, on: Boolean, onClick: () -> Unit) {
+private fun SegmentedPill(options: List<Triple<String, String, String>>, selected: String, onSelect: (String) -> Unit) {
     val pal = ThemeState.palette
-    val bg by androidx.compose.animation.animateColorAsState(if (on) pal.card else Color.Transparent, tween(200), label = "tab")
-    Row(
-        Modifier.clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)).background(bg).clickable(onClick = onClick)
-            .heightIn(min = 48.dp).padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    val idx = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
+    val track = RoundedCornerShape(26.dp)
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        Modifier.fillMaxWidth().height(52.dp).clip(track).background(pal.onAccent.copy(alpha = 0.10f))
+            .border(1.dp, Color.White.copy(alpha = 0.35f), track).padding(4.dp),
     ) {
-        T(label, 24.sp, if (on) pal.ink else pal.onAccentSub, if (on) FontWeight.SemiBold else FontWeight.Medium)
-        if (on) Box(Modifier.clip(RoundedCornerShape(8.dp)).background(pal.tile).padding(horizontal = 8.dp, vertical = 3.dp)) {
-            T(count, 11.sp, pal.ink, FontWeight.Bold)
-        } else OutlineChip(count, pal.onAccentSub)
+        val w = maxWidth / options.size
+        val x by androidx.compose.animation.core.animateDpAsState(
+            w * idx,
+            if (ThemeState.reduceMotion) tween(0) else androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 600f),
+            label = "thumb",
+        )
+        Box(
+            Modifier.offset(x = x).width(w).fillMaxHeight()
+                .shadow(6.dp, RoundedCornerShape(22.dp), ambientColor = pal.shadow.copy(alpha = 0.12f), spotColor = pal.shadow.copy(alpha = 0.2f))
+                .clip(RoundedCornerShape(22.dp)).background(pal.card),
+        )
+        Row(Modifier.fillMaxSize()) {
+            options.forEachIndexed { i, (key, label, count) ->
+                val on = i == idx
+                val fg by androidx.compose.animation.animateColorAsState(if (on) pal.ink else pal.onAccentSub, tween(200), label = "segfg")
+                Row(
+                    Modifier.weight(1f).fillMaxHeight().pressable(scaleTo = 0.97f) { onSelect(key) }
+                        .semantics { this.selected = on },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                ) {
+                    T(label, 16.sp, fg, if (on) FontWeight.Bold else FontWeight.SemiBold)
+                    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(if (on) pal.tile else pal.onAccent.copy(alpha = 0.08f)).padding(horizontal = 7.dp, vertical = 2.dp)) {
+                        T(count, 11.sp, fg, FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }
 
