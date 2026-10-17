@@ -66,7 +66,7 @@ import java.util.Locale
 
 /**
  * Home, laid out like the Cream & Ink / Navy & Lime / Black & Yellow mockups:
- * accent header with a folder-tab progress card, then a dark panel listing the latest records.
+ * accent header with a day strip and a progress card, then a dark panel listing the latest records.
  */
 @Composable
 fun HomeScreen(state: AppState) {
@@ -80,11 +80,14 @@ fun HomeScreen(state: AppState) {
     val dueMap = remember(bookings, cash) { dueAfterCash(bookings, cash) }
     fun dueOf(id: String, fallback: Double?) = dueMap[id] ?: (fallback ?: 0.0)
 
-    // "today" or "month" (the month picked in the period menu)
+    // A single day ("yyyy-MM-dd", picked in the day strip) or "month" (the month picked from the heading)
     val todayCount = bookings.count { it.date.startsWith(today) } + cash.count { it.date.startsWith(today) }
     var scope by rememberSaveable { mutableStateOf("") }
-    val sc = scope.ifBlank { if (todayCount > 0) "today" else "month" }
-    fun inScope(iso: String) = if (sc == "today") iso.startsWith(today) else state.inPeriod(iso)
+    val sc = scope.ifBlank { if (todayCount > 0) today else "month" }
+    val isDay = sc != "month"
+    fun inScope(iso: String) = if (isDay) iso.startsWith(sc) else state.inPeriod(iso)
+    // Days that have any sale or payment (dot under the day pill)
+    val busyDays = remember(bookings, cash) { (bookings.map { it.date.take(10) } + cash.map { it.date.take(10) }).toSet() }
 
     val pb = bookings.filter { inScope(it.date) }
     val pc = cash.filter { inScope(it.date) }
@@ -94,10 +97,10 @@ fun HomeScreen(state: AppState) {
     val dueCount = pb.count { b -> dueOf(b.id, b.balance) > 0.5 }
     val collected = if (t.sales > 0) ((t.sales - balanceDue) / t.sales).coerceIn(0.0, 1.0) else 0.0
 
-    val monthCount = bookings.count { state.inPeriod(it.date) }
     val monthLabel = if (state.month == "all") "All" else runCatching {
         YearMonth.parse(state.month).format(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH))
     }.getOrDefault("Month")
+    val dayLabel = runCatching { LocalDate.parse(sc).format(DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)) }.getOrDefault("")
 
     val expiring = bookings.mapNotNull { b -> b.daysLeft(lists.docTypes)?.let { b to it } }
         .filter { (b, d) -> d in 0..7 && b.bookingStatus !in listOf("CANCELLED", "REFUND") }
@@ -136,8 +139,7 @@ fun HomeScreen(state: AppState) {
         item {
             Header(
                 state = state, user = settings.user, code = code,
-                scope = sc, onScope = { scope = it },
-                todayCount = todayCount, monthLabel = monthLabel, monthCount = monthCount,
+                scope = sc, onScope = { scope = it }, busyDays = busyDays,
                 t = t, collected = collected, paidCount = paidCount, dueCount = dueCount, balanceDue = balanceDue,
             )
         }
@@ -165,7 +167,7 @@ fun HomeScreen(state: AppState) {
         item {
             Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Caps(if (sc == "today") "TODAY'S RECORDS" else "RECORDS · ${monthLabel.uppercase()}", 13.sp, Glass.OnBg)
+                    Caps(if (sc == today) "TODAY'S RECORDS" else if (isDay) "RECORDS · ${dayLabel.uppercase()}" else "RECORDS · ${monthLabel.uppercase()}", 13.sp, Glass.OnBg)
                     OutlineChip(lines.size.toString(), Glass.OnBg)
                     Spacer(Modifier.weight(1f))
                     if (lines.size > shown.size) T("View all", 12.sp, Glass.OnBg, FontWeight.SemiBold,
@@ -191,7 +193,8 @@ fun HomeScreen(state: AppState) {
                         T(
                             when {
                                 bookings.isEmpty() && cash.isEmpty() -> "Tap + to add your first sale or cash payment."
-                                sc == "today" -> "Nothing here today yet."
+                                sc == today -> "Nothing here today yet."
+                                isDay -> "Nothing on this day."
                                 else -> "Nothing here for this month."
                             }, 13.sp, Glass.PanelSub, maxLines = 2,
                         )
@@ -210,46 +213,65 @@ fun HomeScreen(state: AppState) {
 @Composable
 private fun Header(
     state: AppState, user: String, code: String,
-    scope: String, onScope: (String) -> Unit,
-    todayCount: Int, monthLabel: String, monthCount: Int,
+    scope: String, onScope: (String) -> Unit, busyDays: Set<String>,
     t: Totals, collected: Double, paidCount: Int, dueCount: Int, balanceDue: Double,
 ) {
     val pal = ThemeState.palette
     var monthMenu by remember { mutableStateOf(false) }
+    val todayD = LocalDate.now()
+    val day = runCatching { LocalDate.parse(scope) }.getOrNull()   // null = whole month
+    val headingMonth = if (day != null) YearMonth.from(day) else runCatching { YearMonth.parse(state.month) }.getOrNull()
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp)).background(pal.accent)
-            .statusBarsPadding().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+            .statusBarsPadding().padding(top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // Search · date · profile
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // Search · profile
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(44.dp).pressable { state.tab = Tab.Sales }.clip(CircleShape).background(Color.White.copy(alpha = 0.45f)),
                 contentAlignment = Alignment.Center,
             ) { Lc(R.drawable.lc_search, pal.onAccent, 20.dp, description = "Search sales") }
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Caps(LocalDate.now().format(DateTimeFormatter.ofPattern("EEE · d MMM", Locale.ENGLISH)).uppercase(), 13.sp, pal.onAccent, 2.4.sp)
-            }
+            Spacer(Modifier.weight(1f))
             Box(
                 Modifier.size(44.dp).pressable { state.tab = Tab.Settings }.clip(CircleShape).background(pal.onAccent),
                 contentAlignment = Alignment.Center,
             ) { T(initials(user.ifBlank { "Me" }), 15.sp, pal.accent, FontWeight.Bold) }
         }
 
-        // Floating segmented pill: Today | month
-        Box {
-            SegmentedPill(
-                listOf(Triple("today", "Today", todayCount.toString()), Triple("month", "$monthLabel ⌄", monthCount.toString())),
-                scope,
-            ) { key -> if (key == "month" && scope == "month") monthMenu = true else onScope(key) }
-            Box(Modifier.align(Alignment.TopEnd)) { MonthMenu(state, monthMenu) { monthMenu = false; onScope("month") } }
+        // "Saturday, October 17" / "October 2026 ⌄"   ·   Today
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) {
+                Column(
+                    Modifier.clip(RoundedCornerShape(12.dp)).clickable { monthMenu = true }.padding(vertical = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    T(
+                        if (day != null) day.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.ENGLISH)) else "Whole month",
+                        15.sp, pal.onAccentSub, FontWeight.Medium,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        T(headingMonth?.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)) ?: "All time", 30.sp, pal.onAccent, FontWeight.Bold)
+                        Lc(R.drawable.lc_chevron_down, pal.onAccent, 20.dp, description = "Pick a month")
+                    }
+                }
+                MonthMenu(state, monthMenu) { monthMenu = false; if (day == null || state.month != day.toString().take(7)) onScope("month") }
+            }
+            val onToday = day == todayD
+            Box(
+                Modifier.pressable { state.month = todayD.toString().take(7); onScope(todayD.toString()) }
+                    .clip(RoundedCornerShape(100.dp)).background(if (onToday) pal.onAccent else pal.onAccent.copy(alpha = 0.10f))
+                    .heightIn(min = 44.dp).padding(horizontal = 20.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) { T("Today", 16.sp, if (onToday) pal.accent else pal.onAccent, FontWeight.Bold) }
         }
+
+        DayStrip(day, busyDays) { d -> state.month = d.toString().take(7); onScope(d.toString()) }
 
         // One plain rounded metrics card
         run {
-            val first = scope == "today"
             Column(
-                Modifier.fillMaxWidth()
+                Modifier.padding(horizontal = 20.dp).fillMaxWidth()
                     .shadow(10.dp, RoundedCornerShape(24.dp), ambientColor = pal.shadow.copy(alpha = 0.10f), spotColor = pal.shadow.copy(alpha = 0.16f))
                     .clip(RoundedCornerShape(24.dp))
                     .background(pal.card).clickable { state.reportsPage = "agents"; state.tab = Tab.Reports }
@@ -258,7 +280,13 @@ private fun Header(
             ) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        T(if (first) "Today's sales · $code" else "${state.periodLong} · $code", 13.sp, pal.muted, FontWeight.SemiBold)
+                        T(
+                            when {
+                                day == todayD -> "Today's sales · $code"
+                                day != null -> day.format(DateTimeFormatter.ofPattern("d MMMM", Locale.ENGLISH)) + " · $code"
+                                else -> "${state.periodLong} · $code"
+                            }, 13.sp, pal.muted, FontWeight.SemiBold,
+                        )
                         T(amt(t.sales), 30.sp, pal.ink, FontWeight.Bold)
                     }
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -281,41 +309,48 @@ private fun Header(
     }
 }
 
-/** Segmented switch on the accent header: a translucent track with a card-coloured thumb that slides to the chosen option. */
+/** Last 30 days as tall pills (today on the right); the chosen day is filled in. A dot marks days with records. */
 @Composable
-private fun SegmentedPill(options: List<Triple<String, String, String>>, selected: String, onSelect: (String) -> Unit) {
+private fun DayStrip(selected: LocalDate?, busy: Set<String>, onPick: (LocalDate) -> Unit) {
     val pal = ThemeState.palette
-    val idx = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
-    val track = RoundedCornerShape(26.dp)
-    androidx.compose.foundation.layout.BoxWithConstraints(
-        Modifier.fillMaxWidth().height(52.dp).clip(track).background(pal.onAccent.copy(alpha = 0.10f))
-            .border(1.dp, Color.White.copy(alpha = 0.35f), track).padding(4.dp),
+    val today = LocalDate.now()
+    val days = remember(today) { (29 downTo 0).map { today.minusDays(it.toLong()) } }
+    val list = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = (days.size - 5).coerceAtLeast(0))
+    // Bring the chosen day into view when it changes
+    LaunchedEffect(selected) {
+        val i = days.indexOf(selected)
+        if (i >= 0) {
+            val target = (i - 2).coerceAtLeast(0)
+            if (ThemeState.reduceMotion) list.scrollToItem(target) else list.animateScrollToItem(target)
+        }
+    }
+    val dow = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
+    androidx.compose.foundation.lazy.LazyRow(
+        state = list,
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        val w = maxWidth / options.size
-        val x by androidx.compose.animation.core.animateDpAsState(
-            w * idx,
-            if (ThemeState.reduceMotion) tween(0) else androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 600f),
-            label = "thumb",
-        )
-        Box(
-            Modifier.offset(x = x).width(w).fillMaxHeight()
-                .shadow(6.dp, RoundedCornerShape(22.dp), ambientColor = pal.shadow.copy(alpha = 0.12f), spotColor = pal.shadow.copy(alpha = 0.2f))
-                .clip(RoundedCornerShape(22.dp)).background(pal.card),
-        )
-        Row(Modifier.fillMaxSize()) {
-            options.forEachIndexed { i, (key, label, count) ->
-                val on = i == idx
-                val fg by androidx.compose.animation.animateColorAsState(if (on) pal.ink else pal.onAccentSub, tween(200), label = "segfg")
-                Row(
-                    Modifier.weight(1f).fillMaxHeight().pressable(scaleTo = 0.97f) { onSelect(key) }
-                        .semantics { this.selected = on },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        items(days.size) { i ->
+            val d = days[i]
+            val on = d == selected
+            val bg by androidx.compose.animation.animateColorAsState(if (on) pal.onAccent else pal.onAccent.copy(alpha = 0.08f), tween(220), label = "daybg")
+            val fg by androidx.compose.animation.animateColorAsState(if (on) pal.accent else pal.onAccent, tween(220), label = "dayfg")
+            val h by androidx.compose.animation.core.animateDpAsState(
+                if (on) 112.dp else 100.dp,
+                if (ThemeState.reduceMotion) tween(0) else androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 500f), label = "dayh",
+            )
+            Box(Modifier.height(112.dp), contentAlignment = Alignment.Center) {
+                Column(
+                    Modifier.width(64.dp).height(h).pressable(scaleTo = 0.94f) { onPick(d) }
+                        .semantics { this.selected = on }
+                        .clip(RoundedCornerShape(32.dp)).background(bg),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
                 ) {
-                    T(label, 16.sp, fg, if (on) FontWeight.Bold else FontWeight.SemiBold)
-                    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(if (on) pal.tile else pal.onAccent.copy(alpha = 0.08f)).padding(horizontal = 7.dp, vertical = 2.dp)) {
-                        T(count, 11.sp, fg, FontWeight.Bold)
-                    }
+                    T(d.dayOfMonth.toString(), 26.sp, fg, FontWeight.Bold)
+                    T(d.format(dow), 14.sp, if (on) pal.accent else pal.onAccentSub, FontWeight.Medium)
+                    Box(Modifier.padding(top = 4.dp).size(5.dp).clip(CircleShape)
+                        .background(if (d.toString() in busy) fg else Color.Transparent))
                 }
             }
         }
