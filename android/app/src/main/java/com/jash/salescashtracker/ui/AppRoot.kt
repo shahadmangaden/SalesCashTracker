@@ -46,6 +46,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -99,21 +102,13 @@ class AppState {
 
 @Composable
 fun AppRoot() {
-    val view = androidx.compose.ui.platform.LocalView.current
-    val dark = ThemeState.palette.darkBg
-    val user0 by Repository.user.collectAsStateWithLifecycle()
-    androidx.compose.runtime.SideEffect {
-        val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
-        // Light icons over the crimson backdrop, dark icons elsewhere (the sign-in screen is always light)
-        androidx.core.view.WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !(dark && user0 != null)
-    }
     val user by Repository.user.collectAsStateWithLifecycle()
     val sync by Repository.sync.collectAsStateWithLifecycle()
     when {
         sync == SyncState.Checking -> GlassBackground {
             CircularProgressIndicator(Modifier.align(Alignment.Center), color = Glass.Blue)
         }
-        user == null -> AuthScreen()
+        user == null -> { SystemBarIcons(darkContent = !ThemeState.palette.darkBg, navDark = !ThemeState.palette.darkBg); AuthScreen() }
         else -> MainShell()
     }
 }
@@ -128,15 +123,26 @@ fun MainShell() {
         if (top != null) state.pop() else state.tab = Tab.Home
     }
 
+    val pal = ThemeState.palette
+    // Status bar icons: Home sits under the accent header, other tabs on the page backdrop
+    val overLight = if (state.tab == Tab.Home && top == null) pal.accent.luminance() > 0.5f else !pal.darkBg
+    SystemBarIcons(darkContent = overLight, navDark = !pal.darkBg)
+
     CompositionLocalProvider(LocalCurrency provides settings.currency.ifBlank { "AED" }) {
         GlassBackground {
-            Box(Modifier.fillMaxSize().statusBarsPadding()) {
-                when (state.tab) {
-                    Tab.Home -> HomeScreen(state)
-                    Tab.Sales -> SalesScreen(state)
-                    Tab.Cash -> CashScreen(state)
-                    Tab.Reports -> ReportsScreen(state)
-                    Tab.Settings -> SettingsScreen(state)
+            androidx.compose.animation.Crossfade(
+                targetState = state.tab,
+                animationSpec = androidx.compose.animation.core.tween(if (ThemeState.reduceMotion) 0 else 220),
+                label = "tab",
+            ) { tab ->
+                Box(Modifier.fillMaxSize().then(if (tab == Tab.Home) Modifier else Modifier.statusBarsPadding())) {
+                    when (tab) {
+                        Tab.Home -> HomeScreen(state)
+                        Tab.Sales -> SalesScreen(state)
+                        Tab.Cash -> CashScreen(state)
+                        Tab.Reports -> ReportsScreen(state)
+                        Tab.Settings -> SettingsScreen(state)
+                    }
                 }
             }
 
@@ -145,14 +151,15 @@ fun MainShell() {
             // Sheets
             AnimatedVisibility(visible = top != null, enter = fadeIn(), exit = fadeOut()) {
                 Box(
-                    Modifier.fillMaxSize().background(Color(0x30253D62))
+                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (pal.darkCard) 0.5f else 0.28f))
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { state.pop() },
                 )
             }
             AnimatedVisibility(
                 visible = top != null,
-                enter = slideInVertically { it },
-                exit = slideOutVertically { it },
+                // Standard navigation timing (~300 ms), gentle spring, no bounce; fade only with Reduce Motion
+                enter = if (ThemeState.reduceMotion) fadeIn() else slideInVertically(androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = 500f)) { it },
+                exit = if (ThemeState.reduceMotion) fadeOut() else slideOutVertically(androidx.compose.animation.core.tween(240)) { it },
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
                 val r = top
@@ -168,44 +175,62 @@ fun MainShell() {
     }
 }
 
-/** Floating glass tab bar (302dp in the design) plus the 68dp round + button. */
+/** Floating glass tab bar from the mockups: 64dp pill, active item in a 52dp capsule, round accent + button. */
 @Composable
 private fun FloatingNav(state: AppState, modifier: Modifier) {
-    val pill = RoundedCornerShape(100.dp)
+    val pal = ThemeState.palette
+    val pill = RoundedCornerShape(32.dp)
     Row(
-        modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 12.dp).height(68.dp),
+        modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 12.dp).height(64.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
             Modifier.weight(1f).fillMaxHeight()
-                .shadow(14.dp, pill, ambientColor = Color(0xFF3B609D).copy(alpha = 0.14f), spotColor = Color(0xFF3B609D).copy(alpha = 0.22f))
-                .clip(pill).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.92f), Color.White.copy(alpha = 0.80f))))
-                .border(1.dp, Brush.verticalGradient(listOf(Glass.Edge, Color.White.copy(alpha = 0.25f))), pill).padding(5.dp),
-            horizontalArrangement = Arrangement.spacedBy(1.dp),
+                .shadow(if (pal.darkCard) 18.dp else 14.dp, pill, ambientColor = pal.shadow.copy(alpha = 0.16f), spotColor = pal.shadow.copy(alpha = if (pal.darkCard) 0.5f else 0.2f))
+                .clip(pill).background(pal.navBg)
+                .border(1.dp, pal.navEdge, pill).padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Tab.entries.forEach { t ->
                 val on = state.tab == t
+                val bg by androidx.compose.animation.animateColorAsState(
+                    if (on) pal.navActiveBg else Color.Transparent, androidx.compose.animation.core.tween(200), label = "navbg",
+                )
+                val fg by androidx.compose.animation.animateColorAsState(
+                    if (on) pal.navActive else pal.navIdle, androidx.compose.animation.core.tween(200), label = "navfg",
+                )
                 Column(
-                    Modifier.weight(1f).fillMaxHeight().clip(pill)
-                        .background(if (on) Glass.Yellow else Color.Transparent)
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { state.tab = t },
+                    Modifier.weight(1f).height(52.dp).pressable(scaleTo = 0.92f) { state.tab = t }
+                        .semantics { selected = on }
+                        .clip(RoundedCornerShape(26.dp)).background(bg),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+                    verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
                 ) {
-                    Lc(t.icon, if (on) Glass.OnAccent else Glass.Muted, 21.dp, description = t.label)
-                    T(t.label, 9.sp, if (on) Glass.OnAccent else Glass.Muted, if (on) FontWeight.Bold else FontWeight.Medium)
+                    Lc(t.icon, fg, 22.dp, description = null)
+                    T(t.label, 11.sp, fg, if (on) FontWeight.Bold else FontWeight.SemiBold)
                 }
             }
         }
         Box(
-            Modifier.size(68.dp)
-                .shadow(14.dp, CircleShape, ambientColor = Color(0xFF3B609D).copy(alpha = 0.14f), spotColor = Color(0xFF1F1F22).copy(alpha = 0.35f))
-                .clip(CircleShape).background(Color.White.copy(alpha = 0.85f)).padding(6.dp).clip(CircleShape)
-                .background(Brush.linearGradient(listOf(Glass.Yellow, Glass.Accent2)))
-                .clickable { state.push(Route.QuickAdd) },
+            Modifier.size(64.dp)
+                .pressable(haptic = true, scaleTo = 0.9f) { state.push(Route.QuickAdd) }
+                .shadow(16.dp, CircleShape, ambientColor = pal.accentShadow.copy(alpha = 0.3f), spotColor = pal.accentShadow.copy(alpha = 0.45f))
+                .clip(CircleShape).background(pal.accent),
             contentAlignment = Alignment.Center,
-        ) { Lc(R.drawable.lc_plus, Glass.OnAccent, 28.dp, description = "Add") }
+        ) { Lc(R.drawable.lc_plus, pal.onAccent, 26.dp, description = "Add sale or payment") }
+    }
+}
+
+/** Dark or light status / navigation bar icons to suit what is behind them. */
+@Composable
+fun SystemBarIcons(darkContent: Boolean, navDark: Boolean) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.SideEffect {
+        val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+        val c = androidx.core.view.WindowCompat.getInsetsController(window, view)
+        c.isAppearanceLightStatusBars = darkContent
+        c.isAppearanceLightNavigationBars = navDark
     }
 }
 
@@ -230,7 +255,7 @@ fun MonthMenu(state: AppState, open: Boolean, onDismiss: () -> Unit) {
     }
     DropdownMenu(
         expanded = open, onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(22.dp), containerColor = Color.White, shadowElevation = 12.dp,
+        shape = RoundedCornerShape(22.dp), containerColor = Glass.Card, shadowElevation = 12.dp,
         modifier = Modifier.width(230.dp),
     ) {
         T("Show figures for", 11.sp, Glass.Muted, FontWeight.SemiBold, Modifier.padding(start = 16.dp, top = 4.dp, bottom = 6.dp))

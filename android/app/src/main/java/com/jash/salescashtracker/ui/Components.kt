@@ -136,7 +136,7 @@ fun ListRow(
             trailing()
         }
         if (chevron) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color(0xFFC4C4C7))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = com.jash.salescashtracker.ui.Glass.Muted)
         }
     }
 }
@@ -175,10 +175,10 @@ fun pillKindFor(status: String): PillKind = when (status.uppercase()) {
 @Composable
 fun Pill(text: String, kind: PillKind = pillKindFor(text)) {
     val (bg, fg) = when (kind) {
-        PillKind.Good -> Color(0xFFE6F4EA) to AppColors.GreenText
-        PillKind.Warn -> Color(0xFFFFF4E0) to AppColors.OrangeText
-        PillKind.Bad -> Color(0xFFFDECEC) to AppColors.RedText
-        PillKind.Info -> Color(0xFFE3F0FF) to Color(0xFF0060DF)
+        PillKind.Good -> com.jash.salescashtracker.ui.Glass.GreenBg to AppColors.GreenText
+        PillKind.Warn -> com.jash.salescashtracker.ui.Glass.AmberBg to AppColors.OrangeText
+        PillKind.Bad -> com.jash.salescashtracker.ui.Glass.RedBg to AppColors.RedText
+        PillKind.Info -> com.jash.salescashtracker.ui.Glass.YellowSoft to AppColors.Label
         PillKind.Neutral -> AppColors.Fill to AppColors.Secondary
     }
     Text(
@@ -205,8 +205,8 @@ fun SearchField(value: String, onChange: (String) -> Unit, placeholder: String, 
         singleLine = true,
         shape = RoundedCornerShape(12.dp),
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color(0xFFE5E5EA),
-            unfocusedContainerColor = Color(0xFFE9E9EE),
+            focusedContainerColor = com.jash.salescashtracker.ui.Glass.Field,
+            unfocusedContainerColor = com.jash.salescashtracker.ui.Glass.Field,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
         ),
@@ -216,10 +216,10 @@ fun SearchField(value: String, onChange: (String) -> Unit, placeholder: String, 
 /** Field colours matching the design's inputs: white 86% fill, white edge, blue when focused. */
 @Composable
 fun glassFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = Color.White.copy(alpha = 0.92f),
-    unfocusedContainerColor = Color.White.copy(alpha = 0.86f),
+    focusedContainerColor = com.jash.salescashtracker.ui.Glass.Field,
+    unfocusedContainerColor = com.jash.salescashtracker.ui.Glass.Field,
     focusedBorderColor = AppColors.Blue,
-    unfocusedBorderColor = Color.White,
+    unfocusedBorderColor = com.jash.salescashtracker.ui.Glass.Edge,
     focusedLabelColor = AppColors.Blue,
     unfocusedLabelColor = AppColors.Secondary,
 )
@@ -324,9 +324,9 @@ fun DateField(
             shape = RoundedCornerShape(15.dp),
             trailingIcon = { Icon(Icons.Filled.DateRange, null) },
             colors = OutlinedTextFieldDefaults.colors(
-                disabledContainerColor = Color.White.copy(alpha = 0.86f),
+                disabledContainerColor = com.jash.salescashtracker.ui.Glass.Field,
                 disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                disabledBorderColor = Color.White,
+                disabledBorderColor = com.jash.salescashtracker.ui.Glass.Edge,
                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 disabledTrailingIconColor = MaterialTheme.colorScheme.primary,
             ),
@@ -364,7 +364,7 @@ fun SegmentedChips(options: List<Pair<String, String>>, selected: String, onSele
         modifier
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFFE3E3E8))
+            .background(com.jash.salescashtracker.ui.Glass.Field)
             .padding(2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -374,7 +374,7 @@ fun SegmentedChips(options: List<Pair<String, String>>, selected: String, onSele
                 Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (on) Color.White else Color.Transparent)
+                    .background(if (on) com.jash.salescashtracker.ui.Glass.Card else Color.Transparent)
                     .clickable { onSelect(key) }
                     .padding(vertical = 7.dp),
                 contentAlignment = Alignment.Center,

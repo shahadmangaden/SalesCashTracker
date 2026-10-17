@@ -1,22 +1,50 @@
 package com.jash.salescashtracker.ui
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,20 +53,16 @@ import com.jash.salescashtracker.data.Repository
 import com.jash.salescashtracker.data.Totals
 import com.jash.salescashtracker.data.dueAfterCash
 import com.jash.salescashtracker.data.statusWith
-import androidx.compose.runtime.setValue
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.runtime.remember
-import java.time.LocalTime
+import com.jash.salescashtracker.ui.theme.Inter
+import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+/**
+ * Home, laid out like the Cream & Ink / Navy & Lime / Black & Yellow mockups:
+ * accent header with a folder-tab progress card, then a dark panel listing the latest records.
+ */
 @Composable
 fun HomeScreen(state: AppState) {
     val bookings by Repository.bookings.collectAsStateWithLifecycle()
@@ -46,27 +70,29 @@ fun HomeScreen(state: AppState) {
     val lists by Repository.lists.collectAsStateWithLifecycle()
     val settings by Repository.settings.collectAsStateWithLifecycle()
     val code = LocalCurrency.current
+    val today = LocalDate.now().toString()
 
-    val pb = bookings.filter { state.inPeriod(it.date) }
-    val pc = cash.filter { state.inPeriod(it.date) }
-    val t = Totals.of(pb, pc)
-    // Balance still due on this period's sales after agents' cash payments are applied
     val dueMap = remember(bookings, cash) { dueAfterCash(bookings, cash) }
-    val balanceDue = pb.sumOf { dueMap[it.id] ?: (it.balance ?: 0.0) }
-    var homeTab by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
-    val hour = LocalTime.now().hour
-    val greet = when { hour < 12 -> "Good morning"; hour < 17 -> "Good afternoon"; else -> "Good evening" }
-    val firstName = nice(settings.user.split(" ").firstOrNull() ?: "")
+    fun dueOf(id: String, fallback: Double?) = dueMap[id] ?: (fallback ?: 0.0)
 
-    // Six months of sales ending at the selected month
-    val end = if (state.month == "all") YearMonth.now() else runCatching { YearMonth.parse(state.month) }.getOrDefault(YearMonth.now())
-    val mf = DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)
-    fun monthSales(ym: YearMonth) = bookings.filter { it.date.startsWith(ym.toString()) }.sumOf { it.sellingPrice ?: 0.0 }
-    val chart = (5 downTo 0).map { i -> end.minusMonths(i.toLong()).let { it.format(mf) to monthSales(it) } }
-    val growth: Double? = if (state.month == "all") null else {
-        val prev = monthSales(end.minusMonths(1))
-        if (prev > 0) (t.sales - prev) / prev else null
-    }
+    // "today" or "month" (the month picked in the period menu)
+    val todayCount = bookings.count { it.date.startsWith(today) } + cash.count { it.date.startsWith(today) }
+    var scope by rememberSaveable { mutableStateOf("") }
+    val sc = scope.ifBlank { if (todayCount > 0) "today" else "month" }
+    fun inScope(iso: String) = if (sc == "today") iso.startsWith(today) else state.inPeriod(iso)
+
+    val pb = bookings.filter { inScope(it.date) }
+    val pc = cash.filter { inScope(it.date) }
+    val t = Totals.of(pb, pc)
+    val balanceDue = pb.sumOf { dueOf(it.id, it.balance) }
+    val paidCount = pb.count { b -> b.statusWith(dueOf(b.id, b.balance)) == "PAID" }
+    val dueCount = pb.count { b -> dueOf(b.id, b.balance) > 0.5 }
+    val collected = if (t.sales > 0) ((t.sales - balanceDue) / t.sales).coerceIn(0.0, 1.0) else 0.0
+
+    val monthCount = bookings.count { state.inPeriod(it.date) }
+    val monthLabel = if (state.month == "all") "All" else runCatching {
+        YearMonth.parse(state.month).format(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH))
+    }.getOrDefault("Month")
 
     val expiring = bookings.mapNotNull { b -> b.daysLeft(lists.docTypes)?.let { b to it } }
         .filter { (b, d) -> d in 0..7 && b.bookingStatus !in listOf("CANCELLED", "REFUND") }
@@ -76,146 +102,99 @@ fun HomeScreen(state: AppState) {
         .filter { it.second > 0.5 }
     val toCollect = dueAgents.sumOf { it.second }
 
-    data class Activity(val sort: String, @DrawableRes val icon: Int, val cash: Boolean, val title: String, val sub: String, val amount: String, val open: () -> Unit)
-    val activity = (
-        bookings.map { b ->
-            Activity(b.date + b.createdAt, productIcon(b.category), false,
-                listOf(nice(b.customer), sentence(b.category)).filter { it.isNotBlank() }.joinToString(" · "),
-                listOf(nice(b.agent), dayHeader(b.date)).filter { it.isNotBlank() }.joinToString(" · "),
-                cur(b.sellingPrice, code)) { state.push(Route.EditSale(b)) }
-        } + cash.map { c ->
-            Activity(c.date + c.createdAt, R.drawable.lc_wallet, true,
-                "Cash paid · ${nice(c.agent).ifBlank { "No agent" }}",
-                listOf(sentence(c.mode), dayHeader(c.date)).filter { it.isNotBlank() }.joinToString(" · "),
-                "+" + cur(c.amount, code)) { state.push(Route.EditCash(c)) }
+    // Records list (Unpaid / Paid / Cash)
+    var filter by rememberSaveable { mutableStateOf("") }
+    val unpaid = pb.filter { dueOf(it.id, it.balance) > 0.5 }
+    val paid = pb.filter { b -> b.statusWith(dueOf(b.id, b.balance)) == "PAID" }
+    val f = filter.ifBlank { if (unpaid.isNotEmpty()) "unpaid" else if (paid.isNotEmpty()) "paid" else if (pc.isNotEmpty()) "cash" else "unpaid" }
+    data class Line(val sort: String, @DrawableRes val icon: Int, val title: String, val sub: String, val amount: String, val tag: String, val open: () -> Unit)
+    val lines = when (f) {
+        "paid" -> paid.map { b ->
+            Line(b.date + b.createdAt, productIcon(b.category), nice(b.customer),
+                listOf(sentence(b.category), nice(b.agent)).filter { it.isNotBlank() }.joinToString(" · "),
+                amt(b.sellingPrice), "PAID") { state.push(Route.EditSale(b)) }
         }
-        ).sortedByDescending { it.sort }.take(6)
+        "cash" -> pc.map { c ->
+            Line(c.date + c.createdAt, R.drawable.lc_wallet, nice(c.agent).ifBlank { "No agent" },
+                listOf(sentence(c.mode), dayHeader(c.date)).filter { it.isNotBlank() }.joinToString(" · "),
+                "+" + amt(c.amount), "CASH") { state.push(Route.EditCash(c)) }
+        }
+        else -> unpaid.map { b ->
+            Line(b.date + b.createdAt, productIcon(b.category), nice(b.customer),
+                listOf(sentence(b.category), nice(b.agent)).filter { it.isNotBlank() }.joinToString(" · "),
+                amt(dueOf(b.id, b.balance)), "DUE") { state.push(Route.EditSale(b)) }
+        }
+    }.sortedByDescending { it.sort }
+    val shown = lines.take(8)
 
-    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    LazyColumn(contentPadding = PaddingValues(bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
         item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    T(if (firstName.isNotBlank()) "$greet, $firstName" else greet, 13.sp, Glass.OnBgMuted)
-                    T("Your overview", 30.sp, Glass.OnBg, FontWeight.Bold)
+            Header(
+                state = state, user = settings.user, code = code,
+                scope = sc, onScope = { scope = it },
+                todayCount = todayCount, monthLabel = monthLabel, monthCount = monthCount,
+                t = t, collected = collected, paidCount = paidCount, dueCount = dueCount, balanceDue = balanceDue,
+            )
+        }
+
+        if (expiring.isNotEmpty() || toCollect > 0.5) item {
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp).enter(0), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Caps("NEEDS ATTENTION", 13.sp, Glass.OnBg)
+                GlassCard(padding = PaddingValues(14.dp), spacing = 12.dp, radius = 24.dp) {
+                    if (expiring.isNotEmpty()) {
+                        val (b, d) = expiring.first()
+                        AttentionRow(R.drawable.lc_calendar_clock, Glass.Due,
+                            if (expiring.size == 1) "1 visa expires this week" else "${expiring.size} visas expire this week",
+                            "${nice(b.customer)} expires ${whenLeft(d)}") { state.reportsPage = "visas"; state.tab = Tab.Reports }
+                    }
+                    if (toCollect > 0.5) {
+                        AttentionRow(R.drawable.lc_hand_coins, Glass.Ink,
+                            "Collect ${cur(toCollect, code)} from ${dueAgents.size} ${if (dueAgents.size == 1) "agent" else "agents"}", null) {
+                            state.reportsPage = "agents"; state.tab = Tab.Reports
+                        }
+                    }
                 }
-                PeriodChip(state)
             }
         }
 
-        // Hero card (charcoal bento card with a collection ring)
         item {
-            val collected = if (t.sales > 0) ((t.sales - balanceDue) / t.sales).coerceIn(0.0, 1.0) else 0.0
-            val shape = RoundedCornerShape(28.dp)
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Caps(if (sc == "today") "TODAY'S RECORDS" else "RECORDS · ${monthLabel.uppercase()}", 13.sp, Glass.OnBg)
+                    OutlineChip(lines.size.toString(), Glass.OnBg)
+                    Spacer(Modifier.weight(1f))
+                    if (lines.size > shown.size) T("View all", 12.sp, Glass.OnBg, FontWeight.SemiBold,
+                        Modifier.clip(RoundedCornerShape(8.dp)).clickable { state.tab = if (f == "cash") Tab.Cash else Tab.Sales }.padding(4.dp))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip("Unpaid · ${unpaid.size}", f == "unpaid") { filter = "unpaid" }
+                    FilterChip("Paid · ${paid.size}", f == "paid") { filter = "paid" }
+                    FilterChip("Cash · ${pc.size}", f == "cash") { filter = "cash" }
+                }
+            }
+        }
+
+        item {
+            val panelShape = RoundedCornerShape(30.dp)
             Column(
-                Modifier.fillMaxWidth().softShadow(28.dp, 8.dp, 20.dp, 0.25f, 0.7f).clip(shape)
-                    .background(Brush.linearGradient(listOf(Glass.HeroTop, Glass.HeroBottom)))
-                    .clickable { state.tab = Tab.Reports }.padding(20.dp),
+                Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp).fillMaxWidth()
+                    .clip(panelShape).background(Glass.Panel).border(1.dp, Glass.PanelEdge, panelShape).padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        T("Total sales · $code", 13.sp, Glass.HeroMuted, FontWeight.SemiBold)
-                        T(amt(t.sales), 38.sp, Glass.HeroText, FontWeight.Bold)
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            T("Profit ${cur(t.profit, code)}", 12.sp, Glass.Yellow, FontWeight.SemiBold)
-                            if (growth != null) StatusPill(if (growth >= 0) "↗ ${pct(growth)}" else "↘ ${pct(-growth)}", Glass.OnAccent, Glass.Yellow, 10.sp)
-                        }
-                    }
-                    Box(Modifier.size(78.dp), contentAlignment = Alignment.Center) {
-                        androidx.compose.foundation.Canvas(Modifier.size(78.dp)) {
-                            val sw = 8.dp.toPx()
-                            val tl = androidx.compose.ui.geometry.Offset(sw / 2, sw / 2)
-                            val sz = androidx.compose.ui.geometry.Size(size.width - sw, size.height - sw)
-                            drawArc(Glass.HeroTrack, -90f, 360f, false, tl, sz, style = androidx.compose.ui.graphics.drawscope.Stroke(sw))
-                            drawArc(Glass.Yellow, -90f, (360f * collected).toFloat(), false, tl, sz,
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round))
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            T("${Math.round(collected * 100)}%", 16.sp, Glass.HeroText, FontWeight.Bold)
-                            T("collected", 9.sp, Glass.HeroMuted)
-                        }
+                if (shown.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(16.dp), contentAlignment = Alignment.Center) {
+                        T(
+                            when {
+                                bookings.isEmpty() && cash.isEmpty() -> "Tap + to add your first sale or cash payment."
+                                sc == "today" -> "Nothing here today yet."
+                                else -> "Nothing here for this month."
+                            }, 13.sp, Glass.PanelSub, maxLines = 2,
+                        )
                     }
                 }
-                BarChart(chart, dark = true)
-            }
-        }
-
-        // Key figures
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MetricTile(R.drawable.lc_hand_coins, "Balance due · $code", amt(balanceDue), Modifier.weight(1f)) { state.tab = Tab.Sales }
-                    MetricTile(R.drawable.lc_wallet, "Cash paid · $code", amt(t.cash), Modifier.weight(1f)) { state.tab = Tab.Cash }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MetricTile(R.drawable.lc_landmark, "Net remaining · $code", amt(t.remaining), Modifier.weight(1f)) {
-                        state.reportsPage = "agents"; state.tab = Tab.Reports
-                    }
-                    MetricTile(R.drawable.lc_users, "Passengers", num(t.pax).ifBlank { "0" }, Modifier.weight(1f))
-                }
-            }
-        }
-
-        // Needs attention
-        if (expiring.isNotEmpty() || toCollect > 0.5) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SectionHeading("Needs attention", "View all") { state.reportsPage = if (expiring.isNotEmpty()) "visas" else "agents"; state.tab = Tab.Reports }
-                    GlassCard(padding = PaddingValues(13.dp), spacing = 12.dp) {
-                        if (expiring.isNotEmpty()) {
-                            val (b, d) = expiring.first()
-                            AttentionRow(R.drawable.lc_calendar_clock, Glass.Amber,
-                                if (expiring.size == 1) "1 visa expires this week" else "${expiring.size} visas expire this week",
-                                "${nice(b.customer)} expires ${whenLeft(d)}") { state.reportsPage = "visas"; state.tab = Tab.Reports }
-                        }
-                        if (toCollect > 0.5) {
-                            AttentionRow(R.drawable.lc_hand_coins, Glass.Blue,
-                                "Collect ${cur(toCollect, code)} from ${dueAgents.size} ${if (dueAgents.size == 1) "agent" else "agents"}", null) {
-                                state.reportsPage = "agents"; state.tab = Tab.Reports
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Paid / Unpaid / Cash folder tabs with a timeline
-        item {
-            val paidSales = pb.filter { b -> b.statusWith(dueMap[b.id] ?: (b.balance ?: 0.0)) == "PAID" }
-            val unpaidSales = pb.filter { b -> (dueMap[b.id] ?: (b.balance ?: 0.0)) > 0.5 }
-            data class Line(val sort: String, val date: String, @DrawableRes val icon: Int, val title: String, val sub: String, val amount: String, val color: Color, val open: () -> Unit)
-            // Open on Unpaid when something is owed, otherwise on Paid
-            val tab = homeTab.ifBlank { if (unpaidSales.isNotEmpty()) "unpaid" else if (paidSales.isNotEmpty()) "paid" else "cash" }
-            val lines = when (tab) {
-                "paid" -> paidSales.map { b -> Line(b.date + b.createdAt, b.date, productIcon(b.category), nice(b.customer), listOf(sentence(b.category), nice(b.agent)).filter { it.isNotBlank() }.joinToString(" · "), cur(b.sellingPrice, code), Glass.Ink) { state.push(Route.EditSale(b)) } }
-                "cash" -> pc.map { c -> Line(c.date + c.createdAt, c.date, R.drawable.lc_wallet, nice(c.agent).ifBlank { "No agent" }, sentence(c.mode), "+" + cur(c.amount, code), Glass.Green) { state.push(Route.EditCash(c)) } }
-                else -> unpaidSales.map { b -> Line(b.date + b.createdAt, b.date, productIcon(b.category), nice(b.customer), "Due ${cur(dueMap[b.id] ?: 0.0, code)} · ${nice(b.agent)}", cur(b.sellingPrice, code), Glass.Red) { state.push(Route.EditSale(b)) } }
-            }.sortedByDescending { it.sort }.take(8)
-            FolderTabs(
-                listOf("paid" to "Paid · ${paidSales.size}", "unpaid" to "Unpaid · ${unpaidSales.size}", "cash" to "Cash · ${pc.size}"),
-                tab, { homeTab = it },
-            ) {
-                if (lines.isEmpty()) T(if (bookings.isEmpty()) "Tap + to add your first sale or cash payment." else "Nothing here for this month.", 12.sp, Glass.Muted, maxLines = 2, modifier = Modifier.padding(vertical = 8.dp))
-                lines.forEachIndexed { i, l ->
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = l.open), verticalAlignment = Alignment.Top) {
-                        // timeline: date + dashed connector
-                        Column(Modifier.width(44.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            T(runCatching { java.time.LocalDate.parse(l.date.take(10)).dayOfMonth.toString() }.getOrDefault(""), 15.sp, Glass.Ink, FontWeight.Bold)
-                            T(runCatching { java.time.LocalDate.parse(l.date.take(10)).format(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)) }.getOrDefault(""), 10.sp, Glass.Muted)
-                            if (i < lines.lastIndex) androidx.compose.foundation.Canvas(Modifier.width(2.dp).height(18.dp)) {
-                                drawLine(Glass.Divider, androidx.compose.ui.geometry.Offset(size.width / 2, 0f), androidx.compose.ui.geometry.Offset(size.width / 2, size.height),
-                                    strokeWidth = 2f, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
-                            }
-                        }
-                        Row(Modifier.weight(1f).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Box(Modifier.size(34.dp).clip(CircleShape).background(Glass.TileBg), contentAlignment = Alignment.Center) { Lc(l.icon, Glass.Ink, 17.dp) }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                T(l.title.ifBlank { "—" }, 13.sp, Glass.Ink, FontWeight.SemiBold)
-                                T(l.sub, 10.sp, Glass.Muted)
-                            }
-                            T(l.amount, 13.sp, l.color, FontWeight.Bold)
-                        }
-                    }
+                // key on the filter + scope so the rows re-run their staggered entrance when the list changes
+                androidx.compose.runtime.key(f, sc) {
+                    shown.forEachIndexed { i, l -> RecordRow(i == 0, l.icon, l.title, l.sub, l.amount, l.tag, i, l.open) }
                 }
             }
         }
@@ -224,18 +203,195 @@ fun HomeScreen(state: AppState) {
 }
 
 @Composable
+private fun Header(
+    state: AppState, user: String, code: String,
+    scope: String, onScope: (String) -> Unit,
+    todayCount: Int, monthLabel: String, monthCount: Int,
+    t: Totals, collected: Double, paidCount: Int, dueCount: Int, balanceDue: Double,
+) {
+    val pal = ThemeState.palette
+    var monthMenu by remember { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp)).background(pal.accent)
+            .statusBarsPadding().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        // Search · date · profile
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(44.dp).pressable { state.tab = Tab.Sales }.clip(CircleShape).background(Color.White.copy(alpha = 0.45f)),
+                contentAlignment = Alignment.Center,
+            ) { Lc(R.drawable.lc_search, pal.onAccent, 20.dp, description = "Search sales") }
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Caps(LocalDate.now().format(DateTimeFormatter.ofPattern("EEE · d MMM", Locale.ENGLISH)).uppercase(), 13.sp, pal.onAccent, 2.4.sp)
+            }
+            Box(
+                Modifier.size(44.dp).pressable { state.tab = Tab.Settings }.clip(CircleShape).background(pal.onAccent),
+                contentAlignment = Alignment.Center,
+            ) { T(initials(user.ifBlank { "Me" }), 15.sp, pal.accent, FontWeight.Bold) }
+        }
+
+        // Folder tabs + progress card
+        Column {
+            Row(verticalAlignment = Alignment.Bottom) {
+                FolderTab("Today", todayCount.toString(), scope == "today") { onScope("today") }
+                Box {
+                    FolderTab("$monthLabel ⌄", monthCount.toString(), scope == "month") {
+                        if (scope == "month") monthMenu = true else onScope("month")
+                    }
+                    MonthMenu(state, monthMenu) { monthMenu = false; onScope("month") }
+                }
+            }
+            val first = scope == "today"
+            Column(
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(topStart = if (first) 0.dp else 22.dp, topEnd = 22.dp, bottomStart = 22.dp, bottomEnd = 22.dp))
+                    .background(pal.card).clickable { state.reportsPage = "agents"; state.tab = Tab.Reports }
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        T(if (first) "Today's sales · $code" else "${state.periodLong} · $code", 13.sp, pal.muted, FontWeight.SemiBold)
+                        T(amt(t.sales), 30.sp, pal.ink, FontWeight.Bold)
+                    }
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        T("Profit", 11.sp, pal.muted, FontWeight.SemiBold)
+                        T(amt(t.profit), 16.sp, pal.ink, FontWeight.Bold)
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RingStat(collected.toFloat(), t.count.toString(), "SALES", pal.ringFill, Modifier.weight(1f))
+                    RingStat(if (t.count > 0) paidCount / t.count.toFloat() else 0f, paidCount.toString(), "PAID", pal.ringFill, Modifier.weight(1f))
+                    RingStat(if (t.count > 0) dueCount / t.count.toFloat() else 0f, dueCount.toString(), "DUE", pal.due, Modifier.weight(1f))
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(pal.divider))
+                Row(Modifier.fillMaxWidth()) {
+                    MiniFigure("Balance due", cur(balanceDue, code), if (balanceDue > 0.5) pal.due else pal.ink, Modifier.weight(1f)) { state.tab = Tab.Sales }
+                    MiniFigure("Cash paid", cur(t.cash, code), pal.ink, Modifier.weight(1f)) { state.tab = Tab.Cash }
+                }
+            }
+        }
+    }
+}
+
+/** A folder tab on the accent header: the selected one joins the white card below it. */
+@Composable
+private fun FolderTab(label: String, count: String, on: Boolean, onClick: () -> Unit) {
+    val pal = ThemeState.palette
+    val bg by androidx.compose.animation.animateColorAsState(if (on) pal.card else Color.Transparent, tween(200), label = "tab")
+    Row(
+        Modifier.clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)).background(bg).clickable(onClick = onClick)
+            .heightIn(min = 48.dp).padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        T(label, 24.sp, if (on) pal.ink else pal.onAccentSub, if (on) FontWeight.SemiBold else FontWeight.Medium)
+        if (on) Box(Modifier.clip(RoundedCornerShape(8.dp)).background(pal.tile).padding(horizontal = 8.dp, vertical = 3.dp)) {
+            T(count, 11.sp, pal.ink, FontWeight.Bold)
+        } else OutlineChip(count, pal.onAccentSub)
+    }
+}
+
+/** 40dp progress ring with the number inside and a spaced caption (sweeps in over ~500 ms). */
+@Composable
+private fun RingStat(fraction: Float, value: String, label: String, fill: Color, modifier: Modifier = Modifier) {
+    val pal = ThemeState.palette
+    val p = remember { Animatable(0f) }
+    LaunchedEffect(fraction) {
+        if (ThemeState.reduceMotion) p.snapTo(fraction) else p.animateTo(fraction.coerceIn(0f, 1f), tween(520, easing = FastOutSlowInEasing))
+    }
+    Row(modifier.semantics(mergeDescendants = true) { contentDescription = "$value ${label.lowercase()}" },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.size(40.dp)) {
+                val sw = 3.dp.toPx()
+                val tl = Offset(sw / 2 + 1.5.dp.toPx(), sw / 2 + 1.5.dp.toPx())
+                val sz = Size(size.width - sw - 3.dp.toPx(), size.height - sw - 3.dp.toPx())
+                drawArc(pal.track, -90f, 360f, false, tl, sz, style = Stroke(sw))
+                if (p.value > 0f) drawArc(fill, -90f, 360f * p.value, false, tl, sz, style = Stroke(sw, cap = StrokeCap.Round))
+            }
+            T(value, 14.sp, pal.ink, FontWeight.Bold)
+        }
+        Caps(label, 11.sp, pal.ink, 0.8.sp)
+    }
+}
+
+@Composable
+private fun MiniFigure(label: String, value: String, color: Color, modifier: Modifier, onClick: () -> Unit) {
+    Column(modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        T(label, 11.sp, ThemeState.palette.muted, FontWeight.SemiBold)
+        T(value, 15.sp, color, FontWeight.Bold)
+    }
+}
+
+/** A row in the dark panel. The first row is the highlighted accent card, like "NEXT" in the mockup. */
+@Composable
+private fun RecordRow(highlight: Boolean, @DrawableRes icon: Int, title: String, sub: String, amount: String, tag: String, index: Int, onClick: () -> Unit) {
+    val pal = ThemeState.palette
+    val shape = RoundedCornerShape(24.dp)
+    Row(
+        Modifier.fillMaxWidth().enter(index).pressable(scaleTo = 0.98f, onClick = onClick)
+            .then(if (highlight) Modifier.clip(shape).background(pal.accent) else Modifier.clip(shape).border(1.dp, pal.rowEdge, shape))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(RoundedCornerShape(14.dp)).background(if (highlight) Color.White.copy(alpha = 0.5f) else pal.rowIcon),
+            contentAlignment = Alignment.Center,
+        ) { Lc(icon, if (highlight) pal.onAccent else pal.panelText, 20.dp) }
+        Column(Modifier.weight(1f)) {
+            T(title.ifBlank { "—" }, 15.sp, if (highlight) pal.onAccent else pal.panelTitle, if (highlight) FontWeight.Bold else FontWeight.SemiBold)
+            T(sub, 12.sp, if (highlight) pal.onAccentSub else pal.panelSub, if (highlight) FontWeight.Medium else FontWeight.Normal)
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            T(amount, 17.sp, if (highlight) pal.onAccent else pal.panelText, if (highlight) FontWeight.Bold else FontWeight.SemiBold)
+            Caps(tag, 10.sp, if (highlight) pal.onAccent else pal.panelSub, 1.sp)
+        }
+    }
+}
+
+/** Small selectable chip above the panel. */
+@Composable
+private fun FilterChip(text: String, on: Boolean, onClick: () -> Unit) {
+    val pal = ThemeState.palette
+    val shape = RoundedCornerShape(100.dp)
+    val bg by androidx.compose.animation.animateColorAsState(if (on) pal.primary else pal.card, tween(200), label = "chip")
+    Box(
+        Modifier.pressable(scaleTo = 0.95f, onClick = onClick).clip(shape).background(bg).border(1.dp, if (on) pal.primary else Glass.Edge, shape)
+            .heightIn(min = 36.dp).padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) { T(text, 13.sp, if (on) pal.onPrimary else pal.ink, if (on) FontWeight.Bold else FontWeight.Medium) }
+}
+
+@Composable
+private fun OutlineChip(text: String, color: Color) {
+    Box(Modifier.clip(RoundedCornerShape(7.dp)).border(1.dp, color, RoundedCornerShape(7.dp)).padding(horizontal = 7.dp, vertical = 2.dp)) {
+        T(text, 11.sp, color, FontWeight.Bold)
+    }
+}
+
+/** Upper-case caption with letter spacing (section titles, ring labels). */
+@Composable
+fun Caps(text: String, size: TextUnit, color: Color, spacing: TextUnit = 2.sp, modifier: Modifier = Modifier) = Text(
+    text, modifier = modifier, color = color, fontSize = size, fontWeight = FontWeight.Bold, fontFamily = Inter,
+    letterSpacing = spacing, maxLines = 1, overflow = TextOverflow.Ellipsis,
+)
+
+@Composable
 private fun AttentionRow(@DrawableRes icon: Int, tint: Color, title: String, sub: String?, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Lc(icon, tint, 19.dp)
+        Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(Glass.TileBg), contentAlignment = Alignment.Center) { Lc(icon, tint, 18.dp) }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             T(title, 13.sp, Glass.Ink, FontWeight.SemiBold)
             if (sub != null) T(sub, 11.sp, Glass.Muted)
         }
-        Lc(R.drawable.lc_chevron_right, Glass.Ink, 16.dp)
+        Lc(R.drawable.lc_chevron_right, Glass.Muted, 16.dp)
     }
 }
 

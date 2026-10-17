@@ -159,7 +159,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.agentsReport(
     owing.firstOrNull()?.let { (name, t) ->
         item {
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color.White.copy(alpha = 0.46f))
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Glass.Card.copy(alpha = 0.6f))
                     .border(1.dp, Glass.Edge, RoundedCornerShape(18.dp)).padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -341,9 +341,9 @@ fun SettingsScreen(state: AppState) {
             GlassCard(padding = PaddingValues(17.dp), onClick = { dialog = "account" }) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
                     Box(
-                        Modifier.size(52.dp).clip(CircleShape).background(Color(0xFFDCE8FF)).border(1.dp, Color.White, CircleShape),
+                        Modifier.size(52.dp).clip(CircleShape).background(Glass.Yellow).border(1.dp, Glass.Edge, CircleShape),
                         contentAlignment = Alignment.Center,
-                    ) { T(initials(settings.user.ifBlank { user?.email ?: "" }), 19.sp, Glass.Blue, FontWeight.Bold) }
+                    ) { T(initials(settings.user.ifBlank { user?.email ?: "" }), 19.sp, Glass.OnAccent, FontWeight.Bold) }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         T(nice(settings.user).ifBlank { "Your account" }, 18.sp, Glass.Ink, FontWeight.Bold)
                         T(user?.email ?: "", 11.sp, Glass.Muted)
@@ -365,7 +365,7 @@ fun SettingsScreen(state: AppState) {
         item {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (syncLine.isNotEmpty()) Row(
-                    Modifier.clip(RoundedCornerShape(100.dp)).background(Color.White.copy(alpha = 0.9f)).padding(horizontal = 12.dp, vertical = 6.dp),
+                    Modifier.clip(RoundedCornerShape(100.dp)).background(Glass.Card).padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Lc(if (sync == SyncState.Synced) R.drawable.lc_circle_check else if (sync == SyncState.Offline) R.drawable.lc_cloud_off else R.drawable.lc_refresh_cw, syncColor, 14.dp)
@@ -438,7 +438,7 @@ fun SettingsScreen(state: AppState) {
         )
         "theme" -> AlertDialog(
             onDismissRequest = { dialog = null },
-            containerColor = Color.White,
+            containerColor = Glass.Card,
             title = { Text("Theme") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -454,7 +454,7 @@ fun SettingsScreen(state: AppState) {
                             Box(Modifier.size(width = 54.dp, height = 40.dp).clip(RoundedCornerShape(10.dp))
                                 .background(androidx.compose.ui.graphics.Brush.verticalGradient(pal.bg)), contentAlignment = Alignment.Center) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Box(Modifier.size(width = 18.dp, height = 22.dp).clip(RoundedCornerShape(5.dp)).background(Color.White))
+                                    Box(Modifier.size(width = 18.dp, height = 22.dp).clip(RoundedCornerShape(5.dp)).background(pal.card))
                                     Box(Modifier.size(14.dp).clip(CircleShape).background(pal.accent))
                                 }
                             }

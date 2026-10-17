@@ -318,7 +318,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
         ProductGrid(productOptions, category, { if (category != it) { category = it; detail = ""; otherSub = false } }) { m ->
             val shape = RoundedCornerShape(20.dp)
             Column(
-                m.clip(shape).background(Color.White.copy(alpha = 0.55f)).border(1.dp, Glass.Edge, shape).clickable { allProducts = !allProducts }.padding(14.dp),
+                m.clip(shape).background(Glass.Card.copy(alpha = 0.6f)).border(1.dp, Glass.Edge, shape).clickable { allProducts = !allProducts }.padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Box(Modifier.size(38.dp).clip(CircleShape).background(Glass.Charcoal), contentAlignment = Alignment.Center) {
@@ -400,7 +400,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
         // More details accordion
         val shapeMd = RoundedCornerShape(20.dp)
         Column(
-            Modifier.fillMaxWidth().softShadow(20.dp, 4.dp, 12.dp, 0.08f, 0.9f).clip(shapeMd).background(Color.White).border(1.dp, Glass.Edge, shapeMd)
+            Modifier.fillMaxWidth().softShadow(20.dp, 4.dp, 12.dp, 0.08f, 0.9f).clip(shapeMd).background(Glass.Card).border(1.dp, Glass.Edge, shapeMd)
                 .clickable { showMore = !showMore }.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {

@@ -14,6 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -77,60 +78,105 @@ import com.jash.salescashtracker.ui.theme.Inter
 import java.text.DecimalFormat
 import java.util.Locale
 
-// ---------- Design tokens (from the Figma file) ----------
+// ---------- Design tokens (Cream & Ink / Navy & Lime / Black & Yellow mockups) ----------
 
-/** A colour theme. Cards stay white; these set the backdrop, accents and text colours. */
+/** A colour theme. Values come straight from the theme mockups. */
 data class Palette(
     val id: String,
     val name: String,
-    val bg: List<Color>,                 // backdrop gradient (top -> bottom)
-    val glow: List<Pair<Color, Float>>,  // soft blobs: colour + alpha
-    val darkBg: Boolean,                 // true -> light text/status icons over the backdrop
+    val bg: List<Color>,                 // page backdrop (top -> bottom)
+    val glow: Float,                     // strength of the soft accent glow behind the page
+    val darkBg: Boolean,                 // light text / status icons over the backdrop
+    val darkCard: Boolean,               // cards are dark (navy / black themes)
     val onBg: Color, val onBgMuted: Color,
-    val ink: Color, val muted: Color,
+    val ink: Color, val muted: Color,    // text on cards
     val primary: Color, val onPrimary: Color,          // selected chips, main button
-    val accent: Color, val accent2: Color, val onAccent: Color, val accentSoft: Color, // highlights, FAB, active tab
-    val tile: Color, val divider: Color, val track: Color,
-    val heroTop: Color, val heroBottom: Color, val heroText: Color, val heroMuted: Color, val heroTrack: Color,
-    val shadow: Color,
+    val accent: Color, val accent2: Color, val onAccent: Color, val onAccentSub: Color, val accentSoft: Color,
+    val card: Color, val sheet: Color, val field: Color,
+    val tile: Color, val divider: Color, val track: Color, val ringFill: Color, val due: Color,
+    val panel: Color, val panelEdge: Color, val rowEdge: Color, val rowIcon: Color,
+    val panelText: Color, val panelTitle: Color, val panelSub: Color,
+    val navBg: Color, val navEdge: Color, val navActiveBg: Color, val navActive: Color, val navIdle: Color,
+    val shadow: Color, val accentShadow: Color,
 )
 
-val Mustard = Palette(
-    id = "mustard", name = "Mustard & charcoal",
-    bg = listOf(Color(0xFFEEEBE5), Color(0xFFEEEBE5)),
-    glow = listOf(Color(0xFFF5C542) to 0.45f, Color(0xFFF8DE8A) to 0.30f, Color.White to 0.55f, Color(0xFFF2E3C0) to 0.45f),
-    darkBg = false,
-    onBg = Color(0xFF1C1C1E), onBgMuted = Color(0xFF8A857C),
-    ink = Color(0xFF1C1C1E), muted = Color(0xFF8A857C),
-    primary = Color(0xFF1F1F22), onPrimary = Color.White,
-    accent = Color(0xFFF5C542), accent2 = Color(0xFFF2BE2E), onAccent = Color(0xFF1C1C1E), accentSoft = Color(0xFFFCEFC2),
-    tile = Color(0xFFF4EFE4), divider = Color(0xFFE6E1D8), track = Color(0xFFE7E2D8),
-    heroTop = Color(0xFF2A2A2E), heroBottom = Color(0xFF18181B), heroText = Color.White, heroMuted = Color.White.copy(alpha = 0.6f), heroTrack = Color.White.copy(alpha = 0.16f),
-    shadow = Color(0xFF3A342A),
+val Cream = Palette(
+    id = "cream", name = "Cream & Ink",
+    bg = listOf(Color(0xFFEFEBE4), Color(0xFFEFEBE4)), glow = 0f, darkBg = false, darkCard = false,
+    onBg = Color(0xFF1C1B19), onBgMuted = Color(0xFF6B655A),
+    ink = Color(0xFF1C1B19), muted = Color(0xFF6B655A),
+    primary = Color(0xFF1C1B19), onPrimary = Color(0xFFF2EEE6),
+    accent = Color(0xFFF5C842), accent2 = Color(0xFFEDB92E), onAccent = Color(0xFF1C1B19), onAccentSub = Color(0xFF4A3F12), accentSoft = Color(0xFFFCEFC2),
+    card = Color.White, sheet = Color(0xFFF7F4EE), field = Color(0xFFF1EEE8),
+    tile = Color(0xFFEFEBE4), divider = Color(0xFFE6E1D8), track = Color(0xFFE6E1D8), ringFill = Color(0xFF1C1B19), due = Color(0xFFC2410C),
+    panel = Color(0xFF1C1B19), panelEdge = Color(0xFF1C1B19), rowEdge = Color(0xFF34322E), rowIcon = Color(0xFF2B2925),
+    panelText = Color(0xFFF2EEE6), panelTitle = Color(0xFFF5C842), panelSub = Color(0xFFB8B2A7),
+    navBg = Color.White.copy(alpha = 0.86f), navEdge = Color.White.copy(alpha = 0.95f), navActiveBg = Color(0xFF1C1B19).copy(alpha = 0.08f),
+    navActive = Color(0xFF1C1B19), navIdle = Color(0xFF6B655A),
+    shadow = Color(0xFF3C321E), accentShadow = Color(0xFFA0780A),
+)
+
+val Navy = Palette(
+    id = "navy", name = "Navy & Lime",
+    bg = listOf(Color(0xFF0A1120), Color(0xFF0A1120)), glow = 0.18f, darkBg = true, darkCard = true,
+    onBg = Color(0xFFF3F6FB), onBgMuted = Color(0xFFA9B6CC),
+    ink = Color(0xFFF3F6FB), muted = Color(0xFFA9B6CC),
+    primary = Color(0xFFC6F16D), onPrimary = Color(0xFF0A1120),
+    accent = Color(0xFFC6F16D), accent2 = Color(0xFFB2E052), onAccent = Color(0xFF0A1120), onAccentSub = Color(0xFF3B4A1A), accentSoft = Color(0xFF2C3D35),
+    card = Color(0xFF16213A), sheet = Color(0xFF111A2E), field = Color(0xFF0D1526),
+    tile = Color(0xFF1C2840), divider = Color(0xFF22304C), track = Color(0x24FFFFFF), ringFill = Color(0xFFC6F16D), due = Color(0xFFFFB86B),
+    panel = Color(0xFF111A2E), panelEdge = Color(0xFF22304C), rowEdge = Color(0xFF22304C), rowIcon = Color(0xFF1C2840),
+    panelText = Color(0xFFF3F6FB), panelTitle = Color(0xFFC6F16D), panelSub = Color(0xFFA9B6CC),
+    navBg = Color(0xEB141E34), navEdge = Color.White.copy(alpha = 0.12f), navActiveBg = Color.White.copy(alpha = 0.12f),
+    navActive = Color(0xFFC6F16D), navIdle = Color(0xFFA9B6CC),
+    shadow = Color.Black, accentShadow = Color(0xFFC6F16D),
+)
+
+val Black = Palette(
+    id = "black", name = "Black & Yellow",
+    bg = listOf(Color(0xFF0D0D0D), Color(0xFF0D0D0D)), glow = 0.14f, darkBg = true, darkCard = true,
+    onBg = Color(0xFFF5F3EE), onBgMuted = Color(0xFFA8A29E),
+    ink = Color(0xFFF5F3EE), muted = Color(0xFFA8A29E),
+    primary = Color(0xFFF5C842), onPrimary = Color(0xFF111111),
+    accent = Color(0xFFF5C842), accent2 = Color(0xFFE8B92E), onAccent = Color(0xFF111111), onAccentSub = Color(0xFF4A3F12), accentSoft = Color(0xFF3F3822),
+    card = Color(0xFF1C1C1C), sheet = Color(0xFF161616), field = Color(0xFF111111),
+    tile = Color(0xFF262626), divider = Color(0xFF2C2C2C), track = Color(0xFF333333), ringFill = Color(0xFFF5C842), due = Color(0xFFFB923C),
+    panel = Color(0xFF161616), panelEdge = Color(0xFF262626), rowEdge = Color(0xFF2C2C2C), rowIcon = Color(0xFF262626),
+    panelText = Color(0xFFF5F3EE), panelTitle = Color(0xFFF5C842), panelSub = Color(0xFFA8A29E),
+    navBg = Color(0xEB1C1C1C), navEdge = Color.White.copy(alpha = 0.10f), navActiveBg = Color(0xFFF5C842).copy(alpha = 0.16f),
+    navActive = Color(0xFFF5C842), navIdle = Color(0xFFA8A29E),
+    shadow = Color.Black, accentShadow = Color(0xFFF5C842),
 )
 
 val Crimson = Palette(
     id = "crimson", name = "Crimson",
-    bg = listOf(Color(0xFFC81E5B), Color(0xFFA3123F)),
-    glow = listOf(Color(0xFFE8457E) to 0.55f, Color(0xFF8A0B35) to 0.45f, Color(0xFFD62E6A) to 0.35f, Color(0xFF7E0A31) to 0.40f),
-    darkBg = true,
+    bg = listOf(Color(0xFFC81E5B), Color(0xFFA3123F)), glow = 0.35f, darkBg = true, darkCard = false,
     onBg = Color.White, onBgMuted = Color.White.copy(alpha = 0.75f),
     ink = Color(0xFF2B2D42), muted = Color(0xFF9A98AA),
     primary = Color(0xFF2B2D42), onPrimary = Color.White,
-    accent = Color(0xFFD81B60), accent2 = Color(0xFFB0124B), onAccent = Color.White, accentSoft = Color(0xFFFCE4EE),
-    tile = Color(0xFFF7EEF2), divider = Color(0xFFEFE3E8), track = Color(0xFFF3E6EC),
-    heroTop = Color.White, heroBottom = Color(0xFFF9F4F6), heroText = Color(0xFF2B2D42), heroMuted = Color(0xFF9A98AA), heroTrack = Color(0xFFF3E6EC),
-    shadow = Color(0xFF5A0A2A),
+    accent = Color(0xFFD81B60), accent2 = Color(0xFFB0124B), onAccent = Color.White, onAccentSub = Color(0xFFFFD1E0), accentSoft = Color(0xFFFCE4EE),
+    card = Color.White, sheet = Color(0xFFFBF6F8), field = Color(0xFFF6EEF1),
+    tile = Color(0xFFF7EEF2), divider = Color(0xFFEFE3E8), track = Color(0xFFF3E6EC), ringFill = Color(0xFFD81B60), due = Color(0xFFC2410C),
+    panel = Color(0xFF2B2D42), panelEdge = Color(0xFF2B2D42), rowEdge = Color(0xFF3F4258), rowIcon = Color(0xFF3A3C54),
+    panelText = Color.White, panelTitle = Color(0xFFFFB8CF), panelSub = Color(0xFFB9B8C8),
+    navBg = Color.White.copy(alpha = 0.9f), navEdge = Color.White, navActiveBg = Color(0xFFD81B60).copy(alpha = 0.10f),
+    navActive = Color(0xFFD81B60), navIdle = Color(0xFF9A98AA),
+    shadow = Color(0xFF5A0A2A), accentShadow = Color(0xFF5A0A2A),
 )
 
-val Palettes = listOf(Mustard, Crimson)
+val Palettes = listOf(Cream, Navy, Black, Crimson)
 
 /** The active theme; reading it inside composables recomposes them when the theme changes. */
 object ThemeState {
-    var palette by androidx.compose.runtime.mutableStateOf(Mustard)
+    var palette by androidx.compose.runtime.mutableStateOf(Cream)
+    /** True when the phone's "Remove animations" setting is on (Reduce Motion). */
+    var reduceMotion by androidx.compose.runtime.mutableStateOf(false)
     fun load(ctx: android.content.Context) {
         val id = ctx.getSharedPreferences("ui", android.content.Context.MODE_PRIVATE).getString("theme", null)
-        palette = Palettes.firstOrNull { it.id == id } ?: Mustard
+        palette = Palettes.firstOrNull { it.id == id } ?: Cream   // older "mustard" -> Cream & Ink
+        reduceMotion = runCatching {
+            android.provider.Settings.Global.getFloat(ctx.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+        }.getOrDefault(false)
     }
     fun set(ctx: android.content.Context, p: Palette) {
         palette = p
@@ -151,35 +197,54 @@ object Glass {
     val Yellow get() = p.accent           // accent
     val Accent2 get() = p.accent2
     val OnAccent get() = p.onAccent
+    val OnAccentSub get() = p.onAccentSub
     val YellowSoft get() = p.accentSoft
     val BlueBg get() = p.accentSoft
-    val Green = Color(0xFF0E9F6E)
-    val GreenBg = Color(0xFFDDF5EA)
-    val Amber = Color(0xFFB7791F)
-    val AmberBg = Color(0xFFFDF0D2)
-    val Red = Color(0xFFDC2626)
-    val RedBg = Color(0xFFFDE4E4)
+    val Card get() = p.card
+    val Sheet get() = p.sheet
+    val Field get() = p.field
+    val Dark get() = p.darkCard
+    val Green get() = if (p.darkCard) Color(0xFF4ADE80) else Color(0xFF0E9F6E)
+    val GreenBg get() = if (p.darkCard) Color(0xFF4ADE80).copy(alpha = 0.16f) else Color(0xFFDDF5EA)
+    val Amber get() = if (p.darkCard) p.due else Color(0xFFB7791F)
+    val AmberBg get() = if (p.darkCard) p.due.copy(alpha = 0.16f) else Color(0xFFFDF0D2)
+    val Red get() = if (p.darkCard) Color(0xFFF87171) else Color(0xFFDC2626)
+    val RedBg get() = if (p.darkCard) Color(0xFFF87171).copy(alpha = 0.16f) else Color(0xFFFDE4E4)
+    val Due get() = p.due
     val NeutralBg get() = p.tile
     val TileBg get() = p.tile
     val Divider get() = p.divider
     val Track get() = p.track
+    val RingFill get() = p.ringFill
     val CloseBg get() = p.tile
-    val Fill = Color.White.copy(alpha = 0.9f)
-    val Edge = Color.White.copy(alpha = 0.9f)
+    val Fill get() = p.card.copy(alpha = 0.9f)
+    val Edge get() = if (p.darkCard) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.9f)
     val Shadow get() = p.shadow
-    val HeroTop get() = p.heroTop
-    val HeroBottom get() = p.heroBottom
-    val HeroText get() = p.heroText
-    val HeroMuted get() = p.heroMuted
-    val HeroTrack get() = p.heroTrack
+    val Panel get() = p.panel
+    val PanelEdge get() = p.panelEdge
+    val RowEdge get() = p.rowEdge
+    val RowIcon get() = p.rowIcon
+    val PanelText get() = p.panelText
+    val PanelTitle get() = p.panelTitle
+    val PanelSub get() = p.panelSub
+    // Older hero names now map to the dark list panel
+    val HeroTop get() = p.panel
+    val HeroBottom get() = p.panel
+    val HeroText get() = p.panelText
+    val HeroMuted get() = p.panelSub
+    val HeroTrack get() = p.rowEdge
 }
 
-val DonutColors = listOf(
-    Color(0xFFF5C542), Color(0xFF1F1F22), Color(0xFFD9A441), Color(0xFF8A857C),
+val DonutColors get() = if (ThemeState.palette.darkCard) listOf(
+    ThemeState.palette.accent, Color(0xFF8FA3C4), Color(0xFFFFB86B), Color(0xFF5B6B88),
+    Color(0xFFE8F5C8), Color(0xFF3A4A68), Color(0xFFC9B79C), Color(0xFF6B7280),
+) else listOf(
+    Color(0xFFF5C842), Color(0xFF1C1B19), Color(0xFFD9A441), Color(0xFF8A857C),
     Color(0xFFF2D98C), Color(0xFF4A4A4F), Color(0xFFC9B79C), Color(0xFFE8E2D6),
 )
 
-val AvatarColors = listOf(Color(0xFFFCEFC2), Color(0xFFECE8E0), Color(0xFFDDF5EA), Color(0xFFF4E3D3))
+val AvatarColors get() = if (ThemeState.palette.darkCard) listOf(ThemeState.palette.accentSoft, ThemeState.palette.tile, Color(0xFF1F3A33), Color(0xFF3A2E22))
+    else listOf(Color(0xFFFCEFC2), Color(0xFFECE8E0), Color(0xFFDDF5EA), Color(0xFFF4E3D3))
 
 /** Currency code from the business settings, available everywhere in the UI. */
 val LocalCurrency = compositionLocalOf { "AED" }
@@ -227,20 +292,19 @@ fun productIcon(category: String): Int {
 
 // ---------- Surfaces ----------
 
-/** Pastel gradient backdrop with the soft glow from the design. */
-/** Colourful soft backdrop the glass sits on (the look from the first Liquid Glass version). */
+/** Page backdrop: flat theme colour plus the soft blurred accent glow from the mockups. */
 @Composable
 fun GlassBackground(forceLight: Boolean = false, content: @Composable BoxScope.() -> Unit) {
     val pal = ThemeState.palette
     val light = forceLight && pal.darkBg
-    Box(Modifier.fillMaxSize().background(if (light) Brush.verticalGradient(listOf(Color(0xFFF9F1F4), Color(0xFFF4ECEF))) else Brush.verticalGradient(pal.bg))) {
-        Canvas(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().background(if (light) Brush.verticalGradient(listOf(Color(0xFFF7F4EE), Color(0xFFEFEBE4))) else Brush.verticalGradient(pal.bg))) {
+        if (!light && pal.glow > 0f) Canvas(Modifier.fillMaxSize()) {
             val w = size.width; val h = size.height
             fun blob(c: Color, x: Float, y: Float, r: Float) =
                 drawCircle(Brush.radialGradient(listOf(c, c.copy(alpha = 0f)), center = Offset(x, y), radius = r), r, Offset(x, y))
-            val spots = listOf(Triple(0.1f, 0.02f, 0.95f), Triple(1.0f, 0.18f, 0.7f), Triple(0.2f, 0.65f, 0.8f), Triple(0.95f, 0.9f, 0.8f))
-            val glow = if (light) listOf(pal.accent to 0.18f, pal.accentSoft to 0.6f, Color.White to 0.5f, pal.accentSoft to 0.5f) else pal.glow
-            glow.forEachIndexed { i, (c, a) -> val (x, y, r) = spots[i % spots.size]; blob(c.copy(alpha = a), w * x, h * y, w * r) }
+            // 260px circle, right -110px, top 470px on an 844px artboard, blurred 80px
+            blob(pal.accent.copy(alpha = pal.glow), w * 1.05f, h * 0.71f, w * 0.62f)
+            blob(pal.accent.copy(alpha = pal.glow * 0.5f), w * -0.1f, h * 0.12f, w * 0.5f)
         }
         content()
     }
@@ -255,8 +319,8 @@ fun Modifier.glass(radius: Dp = 24.dp, alpha: Float = 0.66f, shadow: Boolean = t
         // Soft raised depth (white highlight + navy shade) from the reference designs
         .softShadow(radius, if (shadow) 5.dp else 3.dp, if (shadow) 14.dp else 8.dp, if (shadow) 0.10f else 0.06f, if (shadow) 0.65f else 0.45f)
         .clip(shape)
-        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = top), Color.White.copy(alpha = bottom))))
-        .border(1.dp, Brush.verticalGradient(listOf(Glass.Edge, Color.White.copy(alpha = 0.25f))), shape)
+        .background(Brush.verticalGradient(listOf(Glass.Card.copy(alpha = top), Glass.Card.copy(alpha = bottom))))
+        .border(1.dp, Brush.verticalGradient(listOf(Glass.Edge, Glass.Edge.copy(alpha = 0.1f))), shape)
 }
 
 @Composable
@@ -312,7 +376,7 @@ fun IconTile(@DrawableRes id: Int, bg: Color = Glass.TileBg, tint: Color = Glass
 @Composable
 fun InitialsAvatar(name: String, index: Int, size: Dp = 37.dp, radius: Dp = 13.dp, fontSize: TextUnit = 12.sp) {
     Box(Modifier.size(size).clip(RoundedCornerShape(radius)).background(AvatarColors[index % AvatarColors.size]), contentAlignment = Alignment.Center) {
-        T(initials(name), fontSize, Glass.Blue, FontWeight.Bold)
+        T(initials(name), fontSize, Glass.Ink, FontWeight.Bold)
     }
 }
 
@@ -354,14 +418,14 @@ fun Choice(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modif
     Box(
         modifier
             .clip(shape)
-            .background(if (selected) Glass.Charcoal else Color.White.copy(alpha = 0.92f))
+            .background(if (selected) Glass.Charcoal else Glass.Card)
             .border(1.dp, if (selected) Glass.Charcoal else Glass.Edge, shape)
             .clickable(onClick = onClick)
             .heightIn(min = 40.dp)
             .padding(horizontal = if (large) 14.dp else 12.dp, vertical = if (large) 10.dp else 9.dp),
         contentAlignment = Alignment.Center,
     ) {
-        T(text, 13.sp, if (selected) Color.White else Glass.Ink, if (selected) FontWeight.SemiBold else FontWeight.Medium)
+        T(text, 13.sp, if (selected) Glass.OnPrimary else Glass.Ink, if (selected) FontWeight.SemiBold else FontWeight.Medium)
     }
 }
 
@@ -391,17 +455,17 @@ fun PrimaryButton(text: String, @DrawableRes icon: Int?, onClick: () -> Unit, mo
         modifier
             .fillMaxWidth()
             .height(54.dp)
-            .shadow(12.dp, shape, ambientColor = Color(0xFF3B609D).copy(alpha = 0.14f), spotColor = Color(0xFF3B609D).copy(alpha = 0.3f))
+            .shadow(12.dp, shape, ambientColor = Glass.Shadow.copy(alpha = 0.14f), spotColor = Glass.Shadow.copy(alpha = 0.3f))
             .clip(shape)
             .background(Glass.Blue)
             .clickable(enabled = !busy, onClick = onClick),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (busy) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+        if (busy) CircularProgressIndicator(color = Glass.OnPrimary, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
         else {
-            if (icon != null) { Lc(icon, Color.White, 20.dp); Spacer(Modifier.width(9.dp)) }
-            T(text, 16.sp, Color.White, FontWeight.Bold)
+            if (icon != null) { Lc(icon, Glass.OnPrimary, 20.dp); Spacer(Modifier.width(9.dp)) }
+            T(text, 16.sp, Glass.OnPrimary, FontWeight.Bold)
         }
     }
 }
@@ -433,7 +497,7 @@ fun GlassInput(
         if (label != null) FieldLabel(label)
         Row(
             Modifier.fillMaxWidth().heightIn(min = 50.dp).clip(shape).recessed(shape)
-                .border(if (focused) 1.5.dp else 1.dp, if (focused) Glass.Yellow else Color.White.copy(alpha = 0.7f), shape).padding(horizontal = 14.dp, vertical = 12.dp),
+                .border(if (focused) 1.5.dp else 1.dp, if (focused) Glass.Yellow else Glass.Edge, shape).padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -478,16 +542,16 @@ fun MetricTile(@DrawableRes icon: Int, label: String, value: String, modifier: M
 fun Segments(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
     val shape = RoundedCornerShape(100.dp)
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 45.dp).clip(shape).background(Color.White.copy(alpha = 0.5f)).border(1.dp, Glass.Edge, shape).padding(4.dp),
+        Modifier.fillMaxWidth().heightIn(min = 45.dp).clip(shape).background(Glass.Field).border(1.dp, Glass.Edge, shape).padding(4.dp),
     ) {
         options.forEach { (key, label) ->
             val on = key == selected
             Box(
                 Modifier.weight(1f).heightIn(min = 37.dp)
                     .then(if (on) Modifier.shadow(6.dp, shape, ambientColor = Glass.Shadow.copy(alpha = 0.08f), spotColor = Glass.Shadow.copy(alpha = 0.1f)) else Modifier)
-                    .clip(shape).background(if (on) Color.White else Color.Transparent).clickable { onSelect(key) },
+                    .clip(shape).background(if (on) Glass.Card else Color.Transparent).clickable { onSelect(key) },
                 contentAlignment = Alignment.Center,
-            ) { T(label, 13.sp, if (on) Glass.Blue else Glass.Muted, FontWeight.SemiBold) }
+            ) { T(label, 13.sp, if (on) Glass.Ink else Glass.Muted, FontWeight.SemiBold) }
         }
     }
 }
@@ -554,16 +618,16 @@ fun SheetFrame(
         Modifier
             .fillMaxWidth()
             .heightIn(max = maxH)
-            .shadow(14.dp, shape, ambientColor = Color(0xFF3B609D).copy(alpha = 0.14f), spotColor = Color(0xFF3B609D).copy(alpha = 0.2f))
+            .shadow(14.dp, shape, ambientColor = Glass.Shadow.copy(alpha = 0.14f), spotColor = Glass.Shadow.copy(alpha = 0.2f))
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(Color(0xFFF7F9FD), Color(0xFFEEF2F9))))
+            .background(Glass.Sheet)
             .border(1.dp, Glass.Edge, shape)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
             .imePadding()
             .padding(top = 10.dp),
     ) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Box(Modifier.width(36.dp).height(4.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFA4B1C7)))
+            Box(Modifier.width(36.dp).height(4.dp).clip(RoundedCornerShape(4.dp)).background(Glass.Muted.copy(alpha = 0.45f)))
         }
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -604,10 +668,12 @@ fun Modifier.softShadow(radius: Dp, offset: Dp = 6.dp, blur: Dp = 12.dp, darkAlp
                 maskFilter = android.graphics.BlurMaskFilter(b, android.graphics.BlurMaskFilter.Blur.NORMAL)
             }
             val sc = Glass.Shadow
-            paint.color = android.graphics.Color.argb((darkAlpha * 255).toInt(), (sc.red * 255).toInt(), (sc.green * 255).toInt(), (sc.blue * 255).toInt())
+            val da = if (ThemeState.palette.darkCard) (darkAlpha * 2.2f).coerceAtMost(0.6f) else darkAlpha
+            paint.color = android.graphics.Color.argb((da * 255).toInt(), (sc.red * 255).toInt(), (sc.green * 255).toInt(), (sc.blue * 255).toInt())
             canvas.nativeCanvas.drawRoundRect(o, o, size.width + o, size.height + o, r, r, paint)
-            paint.color = android.graphics.Color.argb((lightAlpha * 255).toInt(), 255, 255, 255)
-            canvas.nativeCanvas.drawRoundRect(-o, -o, size.width - o, size.height - o, r, r, paint)
+            val la = if (ThemeState.palette.darkCard) 0f else lightAlpha
+            paint.color = android.graphics.Color.argb((la * 255).toInt(), 255, 255, 255)
+            if (la > 0f) canvas.nativeCanvas.drawRoundRect(-o, -o, size.width - o, size.height - o, r, r, paint)
         }
     }
 
@@ -633,7 +699,7 @@ fun DateStrip(selected: String, onSelect: (String) -> Unit, onPickOlder: () -> U
         val pill = RoundedCornerShape(999.dp)
         Box(
             Modifier.size(width = 52.dp, height = 78.dp).softShadow(26.dp, 3.dp, 10.dp, 0.08f, 0.45f).clip(pill)
-                .background(Color.White.copy(alpha = 0.9f)).border(1.dp, Glass.Edge, pill).clickable(onClick = onPickOlder),
+                .background(Glass.Card).border(1.dp, Glass.Edge, pill).clickable(onClick = onPickOlder),
             contentAlignment = Alignment.Center,
         ) { Lc(R.drawable.lc_calendar, Glass.Blue, 22.dp, description = "Pick an older date") }
         days.forEach { d ->
@@ -645,8 +711,8 @@ fun DateStrip(selected: String, onSelect: (String) -> Unit, onPickOlder: () -> U
                 Modifier.size(width = 52.dp, height = 78.dp).graphicsLayer { scaleX = scale; scaleY = scale }
                     .softShadow(26.dp, if (on) 5.dp else 3.dp, 10.dp, if (on) 0.22f else 0.08f, 0.45f)
                     .clip(pill)
-                    .background(if (on) Raised else Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.75f))))
-                    .border(1.dp, if (on) Color.White.copy(alpha = 0.5f) else Glass.Edge, pill)
+                    .background(if (on) Raised else Brush.verticalGradient(listOf(Glass.Card, Glass.Card.copy(alpha = 0.85f))))
+                    .border(1.dp, if (on) Glass.Yellow else Glass.Edge, pill)
                     .clickable { onSelect(d.toString()) },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
@@ -674,7 +740,7 @@ fun ProductGrid(options: List<String>, selected: String, onSelect: (String) -> U
                         val shape = RoundedCornerShape(20.dp)
                         Box(
                             m.then(if (on) Modifier else Modifier.softShadow(20.dp, 5.dp, 14.dp, 0.10f, 0.9f)).clip(shape)
-                                .then(if (on) Modifier.recessed(shape, Glass.YellowSoft) else Modifier.background(Color.White))
+                                .then(if (on) Modifier.recessed(shape, Glass.YellowSoft) else Modifier.background(Glass.Card))
                                 .border(if (on) 2.dp else 1.dp, if (on) Glass.Charcoal else Glass.Edge, shape)
                                 .clickable { onSelect(o) },
                         ) {
@@ -699,30 +765,36 @@ fun ProductGrid(options: List<String>, selected: String, onSelect: (String) -> U
 }
 
 /** Pressed-in (recessed) surface: darker top edge fading to the fill, like a soft inner shadow. */
-fun Modifier.recessed(shape: androidx.compose.ui.graphics.Shape, fill: Color = Color(0xFFF1EEE8)): Modifier =
-    this.background(fill, shape).drawWithContent {
+fun Modifier.recessed(shape: androidx.compose.ui.graphics.Shape, fill: Color = Color.Unspecified): Modifier {
+    val dark = ThemeState.palette.darkCard
+    val f = if (fill == Color.Unspecified) ThemeState.palette.field else fill
+    return this.background(f, shape).drawWithContent {
         drawContent()
-        drawRect(Brush.verticalGradient(listOf(Color(0x24302A20), Color.Transparent), endY = 14.dp.toPx()))
-        drawRect(Brush.horizontalGradient(listOf(Color(0x14302A20), Color.Transparent), endX = 10.dp.toPx()))
-        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0x66FFFFFF)), startY = size.height - 8.dp.toPx()))
+        drawRect(Brush.verticalGradient(listOf(if (dark) Color(0x40000000) else Color(0x24302A20), Color.Transparent), endY = 14.dp.toPx()))
+        drawRect(Brush.horizontalGradient(listOf(if (dark) Color(0x26000000) else Color(0x14302A20), Color.Transparent), endX = 10.dp.toPx()))
+        drawRect(Brush.verticalGradient(listOf(Color.Transparent, if (dark) Color(0x0FFFFFFF) else Color(0x66FFFFFF)), startY = size.height - 8.dp.toPx()))
     }
+}
 
 /** Main save button: charcoal with a mustard check badge and soft depth. */
 @Composable
 fun SubmitButton(text: String, @DrawableRes icon: Int?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(100.dp)
     Row(
-        modifier.fillMaxWidth().heightIn(min = 56.dp).softShadow(100.dp, 6.dp, 16.dp, 0.28f, 0.8f).clip(shape)
-            .background(Brush.verticalGradient(listOf(Glass.Charcoal.copy(alpha = 0.9f).compositeOver(Color.White), Glass.Charcoal)))
-            .clickable(onClick = onClick).padding(vertical = 14.dp),
+        modifier.fillMaxWidth().heightIn(min = 56.dp).pressable(onClick = onClick, haptic = true)
+            .softShadow(100.dp, 6.dp, 16.dp, 0.28f, 0.8f).clip(shape)
+            .background(Glass.Charcoal).padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Box(Modifier.size(28.dp).clip(CircleShape).background(Glass.Yellow), contentAlignment = Alignment.Center) { Lc(icon, Glass.OnAccent, 17.dp) }
+            val same = Glass.Charcoal == Glass.Yellow
+            Box(Modifier.size(28.dp).clip(CircleShape).background(if (same) Glass.OnPrimary else Glass.Yellow), contentAlignment = Alignment.Center) {
+                Lc(icon, if (same) Glass.Yellow else Glass.OnAccent, 17.dp)
+            }
             Spacer(Modifier.width(10.dp))
         }
-        T(text, 17.sp, Color.White, FontWeight.Bold)
+        T(text, 17.sp, Glass.OnPrimary, FontWeight.Bold)
     }
 }
 
@@ -731,7 +803,7 @@ fun SubmitButton(text: String, @DrawableRes icon: Int?, onClick: () -> Unit, mod
 fun StatusTabs(options: List<Triple<String, String, Color>>, selected: String, onSelect: (String) -> Unit) {
     val track = RoundedCornerShape(18.dp)
     Row(
-        Modifier.fillMaxWidth().clip(track).recessed(track, Color(0xFFE9E5DD)).padding(5.dp),
+        Modifier.fillMaxWidth().clip(track).recessed(track).padding(5.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         options.forEach { (key, label, dot) ->
@@ -740,7 +812,7 @@ fun StatusTabs(options: List<Triple<String, String, Color>>, selected: String, o
             Row(
                 Modifier.weight(1f).heightIn(min = 48.dp)
                     .then(if (on) Modifier.softShadow(14.dp, 3.dp, 8.dp, 0.14f, 0.6f) else Modifier)
-                    .clip(tab).background(if (on) Color.White else Color.Transparent).clickable { onSelect(key) }
+                    .clip(tab).background(if (on) Glass.Card else Color.Transparent).clickable { onSelect(key) }
                     .padding(horizontal = 6.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
@@ -766,7 +838,7 @@ fun ModeCards(options: List<Pair<String, Int>>, selected: String, onSelect: (Str
                         Modifier.weight(1f).heightIn(min = 78.dp)
                             .then(if (on) Modifier else Modifier.softShadow(16.dp, 4.dp, 10.dp, 0.10f, 0.9f))
                             .clip(shape)
-                            .then(if (on) Modifier.recessed(shape, Glass.YellowSoft) else Modifier.background(Color.White))
+                            .then(if (on) Modifier.recessed(shape, Glass.YellowSoft) else Modifier.background(Glass.Card))
                             .border(if (on) 2.dp else 1.dp, if (on) Glass.Charcoal else Glass.Edge, shape)
                             .clickable { onSelect(key) }.padding(horizontal = 4.dp, vertical = 10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -809,7 +881,7 @@ fun FolderTabs(tabs: List<Pair<String, String>>, selected: String, onSelect: (St
                 val on = key == selected
                 Box(
                     Modifier.weight(1f).clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-                        .background(if (on) Color.White else Color.White.copy(alpha = 0.6f))
+                        .background(if (on) Glass.Card else Glass.Card.copy(alpha = 0.55f))
                         .clickable { onSelect(key) }.heightIn(min = 48.dp).padding(vertical = if (on) 14.dp else 11.dp),
                     contentAlignment = Alignment.Center,
                 ) { T(label, if (on) 14.sp else 12.sp, if (on) Glass.Ink else Glass.Muted, if (on) FontWeight.Bold else FontWeight.Medium) }
@@ -820,9 +892,42 @@ fun FolderTabs(tabs: List<Pair<String, String>>, selected: String, onSelect: (St
             bottomStart = 24.dp, bottomEnd = 24.dp,
         )
         Column(
-            Modifier.fillMaxWidth().softShadow(24.dp, 5.dp, 14.dp, 0.10f, 0.5f).clip(shape).background(Color.White).padding(14.dp),
+            Modifier.fillMaxWidth().softShadow(24.dp, 5.dp, 14.dp, 0.10f, 0.5f).clip(shape).background(Glass.Card).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
             content = content,
         )
     }
+}
+
+// ---------- Motion (Animations & Motion Graphics guide) ----------
+
+/** Press compression: scales to 96% while held (spring, ~180 ms), with optional haptic tick. Reduce Motion skips the scale. */
+fun Modifier.pressable(enabled: Boolean = true, haptic: Boolean = false, scaleTo: Float = 0.96f, onClick: () -> Unit): Modifier = androidx.compose.ui.composed {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val reduce = ThemeState.reduceMotion
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        if (pressed && !reduce) scaleTo else 1f,
+        androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 900f), label = "press",
+    )
+    val hf = androidx.compose.ui.platform.LocalHapticFeedback.current
+    this.graphicsLayer { scaleX = scale; scaleY = scale }
+        .clickable(interactionSource = source, indication = null, enabled = enabled) {
+            if (haptic) hf.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+            onClick()
+        }
+}
+
+/** Staggered list entrance: fade + 12dp rise, 60 ms apart (capped), ease-out. Immediate with Reduce Motion. */
+fun Modifier.enter(index: Int): Modifier = androidx.compose.ui.composed {
+    val reduce = ThemeState.reduceMotion
+    val p = remember { androidx.compose.animation.core.Animatable(if (reduce) 1f else 0f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (!reduce) {
+            kotlinx.coroutines.delay(60L * index.coerceAtMost(6))
+            p.animateTo(1f, androidx.compose.animation.core.tween(320, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        }
+    }
+    val rise = with(androidx.compose.ui.platform.LocalDensity.current) { 12.dp.toPx() }
+    this.graphicsLayer { alpha = p.value; translationY = (1f - p.value) * rise }
 }

@@ -91,7 +91,7 @@ fun AuthScreen() {
         }
     }
 
-    GlassBackground(forceLight = true) {
+    GlassBackground {
         Column(
             Modifier.fillMaxSize().systemBarsPadding().imePadding().verticalScroll(rememberScrollState())
                 .padding(start = 28.dp, end = 28.dp, top = 42.dp, bottom = 16.dp),
@@ -100,7 +100,7 @@ fun AuthScreen() {
             // Brand
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.size(44.dp).clip(RoundedCornerShape(15.dp)).background(Glass.Blue), contentAlignment = Alignment.Center) {
-                    Lc(R.drawable.lc_plane, Color.White, 24.dp)
+                    Lc(R.drawable.lc_plane, Glass.OnPrimary, 24.dp)
                 }
                 Column {
                     T("Sales Cash", 16.sp, Glass.Ink, FontWeight.Bold)
@@ -169,8 +169,8 @@ fun AuthScreen() {
 private fun Illustration() {
     Box(Modifier.fillMaxWidth().height(164.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(174.dp).align(Alignment.TopCenter)) {
-            drawCircle(Color.White.copy(alpha = 0.7f), radius = size.minDimension / 2 - 1f, style = Stroke(1.5f))
-            drawCircle(Color.White.copy(alpha = 0.55f), radius = size.minDimension * 118f / 174f / 2, style = Stroke(1.5f))
+            drawCircle(Glass.Muted.copy(alpha = 0.35f), radius = size.minDimension / 2 - 1f, style = Stroke(1.5f))
+            drawCircle(Glass.Muted.copy(alpha = 0.25f), radius = size.minDimension * 118f / 174f / 2, style = Stroke(1.5f))
         }
         Row(
             Modifier.rotate(-7f).width(222.dp).height(123.dp)
@@ -186,7 +186,7 @@ private fun Illustration() {
             }
         }
         Row(
-            Modifier.offset(x = 100.dp, y = 55.dp).clip(RoundedCornerShape(100.dp)).background(Color.White).padding(horizontal = 13.dp, vertical = 9.dp),
+            Modifier.offset(x = 100.dp, y = 55.dp).clip(RoundedCornerShape(100.dp)).background(Glass.Card).padding(horizontal = 13.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
