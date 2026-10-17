@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -902,7 +903,7 @@ fun FolderTabs(tabs: List<Pair<String, String>>, selected: String, onSelect: (St
 // ---------- Motion (Animations & Motion Graphics guide) ----------
 
 /** Press compression: scales to 96% while held (spring, ~180 ms), with optional haptic tick. Reduce Motion skips the scale. */
-fun Modifier.pressable(enabled: Boolean = true, haptic: Boolean = false, scaleTo: Float = 0.96f, onClick: () -> Unit): Modifier = androidx.compose.ui.composed {
+fun Modifier.pressable(enabled: Boolean = true, haptic: Boolean = false, scaleTo: Float = 0.96f, onClick: () -> Unit): Modifier = composed {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val reduce = ThemeState.reduceMotion
@@ -919,7 +920,7 @@ fun Modifier.pressable(enabled: Boolean = true, haptic: Boolean = false, scaleTo
 }
 
 /** Staggered list entrance: fade + 12dp rise, 60 ms apart (capped), ease-out. Immediate with Reduce Motion. */
-fun Modifier.enter(index: Int): Modifier = androidx.compose.ui.composed {
+fun Modifier.enter(index: Int): Modifier = composed {
     val reduce = ThemeState.reduceMotion
     val p = remember { androidx.compose.animation.core.Animatable(if (reduce) 1f else 0f) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
