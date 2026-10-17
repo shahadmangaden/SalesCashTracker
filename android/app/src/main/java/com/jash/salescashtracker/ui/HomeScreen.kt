@@ -168,7 +168,7 @@ fun HomeScreen(state: AppState) {
             Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Caps(if (sc == today) "TODAY'S RECORDS" else if (isDay) "RECORDS · ${dayLabel.uppercase()}" else "RECORDS · ${monthLabel.uppercase()}", 13.sp, Glass.OnBg)
-                    OutlineChip(lines.size.toString(), Glass.OnBg)
+                    OutlineChip((pb.size + pc.size).toString(), Glass.OnBg)   // all records in this period, not just the open tab
                     Spacer(Modifier.weight(1f))
                     if (lines.size > shown.size) T("View all", 12.sp, Glass.OnBg, FontWeight.SemiBold,
                         Modifier.clip(RoundedCornerShape(8.dp)).clickable { state.tab = if (f == "cash") Tab.Cash else Tab.Sales }.padding(4.dp))

@@ -275,14 +275,17 @@ function renderDashboard(v) {
   // recent cash
   const recentCash = data.cash.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
 
+  // Same rule as the phone app: each agent's cash is applied to their sales, oldest first
+  dueMap = dueAfterCash();
+  const due = B.reduce((s, b) => s + dueOf(b), 0);
   v.innerHTML = `
     <div class="grid kpis">
       ${kpi('Total Sales', money(t.sales), `${cur} · ${periodLabel()}`)}
       ${kpi('Net Cost', money(t.cost), cur)}
       ${kpi('Profit', money(t.profit), `Margin ${pct(t.margin)}`, 'good')}
       ${kpi('Bookings', t.count, `${t.pax} pax served`)}
-      ${kpi('Paid in Booking Rows', money(t.paid), cur)}
-      ${kpi('Unpaid Balance', money(t.balance), 'Row-level balance due', t.balance > 0 ? 'warn' : '')}
+      ${kpi('Paid', money(t.sales - due), `${cur} · incl. agents' cash`, 'good')}
+      ${kpi('Balance Due', money(due), 'after agents\' cash payments', due > 0.5 ? 'warn' : '')}
       ${kpi('Cash Paid (Log)', money(t.cash), `${C.length} entries`, 'good')}
       ${kpi('Net Remaining', money(t.remaining), 'Balance − cash log', t.remaining > 0 ? 'bad' : '')}
     </div>
