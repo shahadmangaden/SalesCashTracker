@@ -34,6 +34,7 @@ await esbuild.build({
 
 // 2. Copy UI files
 for (const f of ['app.js', 'styles.css']) fs.copyFileSync(path.join(root, 'src', f), path.join(out, f));
+fs.cpSync(path.join(root, 'src', 'fonts'), path.join(out, 'fonts'), { recursive: true });
 
 // 3. index.html: load the bridge first, add PWA manifest + service worker
 let html = fs.readFileSync(path.join(root, 'src', 'index.html'), 'utf8');

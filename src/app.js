@@ -56,6 +56,26 @@ const SUB_PRODUCTS = {
   'OTHER': ['SERVICE CHARGE', 'COURIER', 'MISC'],
 };
 
+// ---------- Theme (shared look with the Android app) ----------
+const THEMES = [
+  { id: 'mustard', name: 'Mustard & charcoal', bg: 'linear-gradient(180deg,#f3ede0,#eeebe5)', accent: '#f5c542' },
+  { id: 'crimson', name: 'Crimson', bg: 'linear-gradient(180deg,#c81e5b,#a3123f)', accent: '#ffffff' },
+];
+function currentTheme() { try { return localStorage.getItem('theme') || 'mustard'; } catch { return 'mustard'; } }
+function applyTheme(id) {
+  document.documentElement.dataset.theme = id;
+  try { localStorage.setItem('theme', id); } catch {}
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = id === 'crimson' ? '#c81e5b' : '#eeebe5';
+}
+applyTheme(currentTheme());
+
+const PRODUCT_EMOJI = [['FLIGHT', '✈️'], ['BUS', '🚌'], ['UMRAH', '🕋'], ['HAJJ', '🕋'], ['HOTEL', '🏨'], ['INSURANCE', '🛡️'], ['CAR', '🚗'],
+  ['TYPING', '📑'], ['DOCUMENT', '📑'], ['TOUR', '🌴'], ['PACKAGE', '🧳'], ['GLOBAL', '🌍'], ['VISA', '🛂'], ['ENTRY', '🛂']];
+const productEmoji = c => (PRODUCT_EMOJI.find(([k]) => up(c).includes(k)) || [0, '🎫'])[1];
+const MODE_LABEL = { 'CASH': ['💵', 'Cash on Hand'], 'BANK TRANSFER': ['🏦', 'Direct Transfer'], 'CDM DEPOSIT': ['🧾', 'Deposit / POS'],
+  'CREDIT CARD': ['💳', 'Credit card'], 'DEBIT CARD': ['💳', 'Debit card'], 'ONLINE PAYMENT LINK': ['📱', 'Online link'], 'WALLET PAYMENT': ['👛', 'Wallet'], 'CHEQUE': ['📝', 'Cheque'] };
+const sentenceCase = v => { const t = String(v || '').toLowerCase(); return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/\bksa\b/gi, 'KSA').replace(/\buae\b/gi, 'UAE').replace(/multipple/gi, 'multiple'); };
+
 function emptyData() {
   return {
     version: 1,
@@ -459,7 +479,9 @@ function openBookingForm(b, isCopy) {
         ${f('Customer Name', `<input type="text" name="customer" value="${val('customer')}" required>`, 'span2', 1)}
         ${f('Customer Type', selectHTML('customerType', L.customerTypes, b.customerType))}
         ${f('Agency / Sub-Agent Name', datalistInput('agent', agents, b.agent, 'dlAgents'), 'span2')}
-        ${f('Product Category', selectHTML('category', L.categories, b.category))}
+        ${f('Product Category', selectHTML('category', L.categories, b.category), 'hide')}
+        <div class="picker"><span class="picker-label">Product</span><div class="tiles" id="prodTiles">${L.categories.map(c => `<button type="button" class="tile" data-v="${esc(c)}"><span class="ico">${productEmoji(c)}</span><span class="nm">${esc(sentenceCase(c))}</span></button>`).join('')}</div>
+          <div class="subs" id="subChips"></div></div>
         ${f('Contact', `<input type="text" name="contact" value="${val('contact')}">`)}
         ${f('Product / Service Detail', datalistInput('detail', details, b.detail, 'dlDetails'), 'span2')}
         ${f('Sector / Destination', datalistInput('sector', L.countries, b.sector, 'dlSector'))}
@@ -474,9 +496,17 @@ function openBookingForm(b, isCopy) {
         ${f('Selling Price', `<input type="number" name="sellingPrice" step="0.01" value="${b.sellingPrice ?? ''}">`)}
         ${f('Profit', `<div class="calc" id="cProfit"></div>`)}
         ${f('Profit %', `<div class="calc" id="cMargin"></div>`)}
+        <div class="picker"><span class="profit-pill" id="profitPill" hidden></span>
+          <span class="picker-label">Payment status</span>
+          <div class="seg" id="paySeg">
+            <button type="button" data-v="PAID"><i style="background:var(--green)"></i>Paid in Full</button>
+            <button type="button" data-v="PARTIAL"><i style="background:#f59e0b"></i>Partial Payment</button>
+            <button type="button" data-v="PENDING"><i style="background:var(--red)"></i>Awaiting Payment</button>
+          </div></div>
         ${f('Amount Paid', `<input type="number" name="amountPaid" step="0.01" value="${b.amountPaid ?? ''}">`)}
-        ${f('Payment Status', selectHTML('paymentStatus', L.paymentStatuses, b.paymentStatus))}
-        ${f('Payment Mode', selectHTML('paymentMode', L.paymentModes, b.paymentMode))}
+        ${f('Payment Status', selectHTML('paymentStatus', L.paymentStatuses, b.paymentStatus), 'hide')}
+        ${f('Payment Mode', selectHTML('paymentMode', L.paymentModes, b.paymentMode), 'hide')}
+        <div class="picker"><span class="picker-label">Payment mode</span><div class="tiles modes" id="modeTiles">${L.paymentModes.map(m => { const [e, n] = MODE_LABEL[m] || ['💰', sentenceCase(m)]; return `<button type="button" class="tile" data-v="${esc(m)}"><span class="ico">${e}</span><span class="nm">${esc(n)}</span></button>`; }).join('')}</div></div>
         ${f('Balance Due', `<div class="calc" id="cBal"></div>`)}
         <div class="span4"><button type="button" class="btn small" id="fullPaid">Mark fully paid</button> <span class="muted" style="font-size:12px">Payment status updates automatically from the amount paid unless you choose one.</span></div>
 
@@ -521,7 +551,38 @@ function openBookingForm(b, isCopy) {
       form.paymentStatus.value = paid <= 0 ? 'PENDING' : paid >= r.sellingPrice ? 'PAID' : 'PARTIAL';
     }
   };
-  form.addEventListener('input', live); form.addEventListener('change', live); live();
+  // Quick pickers: tiles / segmented control drive the (hidden) selects so saving works as before
+  const pick = (name, v) => { form[name].value = v; form[name].dispatchEvent(new Event('change', { bubbles: true })); };
+  $$('#prodTiles .tile').forEach(t => t.onclick = () => { if (form.category.value !== t.dataset.v) form.detail.value = ''; pick('category', t.dataset.v); });
+  $$('#modeTiles .tile').forEach(t => t.onclick = () => pick('paymentMode', t.dataset.v));
+  $$('#paySeg button').forEach(bt => bt.onclick = () => {
+    statusTouched = true;
+    const v = bt.dataset.v;
+    if (v === 'PAID') form.amountPaid.value = form.sellingPrice.value;
+    if (v === 'PENDING') form.amountPaid.value = '';
+    pick('paymentStatus', v);
+    if (v === 'PARTIAL') form.amountPaid.focus();
+  });
+  const syncPickers = () => {
+    $$('#prodTiles .tile').forEach(t => t.classList.toggle('on', t.dataset.v === form.category.value));
+    $$('#modeTiles .tile').forEach(t => t.classList.toggle('on', t.dataset.v === form.paymentMode.value));
+    $$('#paySeg button').forEach(bt => bt.classList.toggle('on', bt.dataset.v === form.paymentStatus.value));
+    const subs = SUB_PRODUCTS[up(form.category.value)] || [];
+    const box = $('#subChips');
+    if (box.dataset.for !== form.category.value || box.dataset.sel !== up(form.detail.value)) {
+      box.dataset.for = form.category.value; box.dataset.sel = up(form.detail.value);
+      box.innerHTML = subs.map(x => `<button type="button" class="chip ${up(form.detail.value) === x ? 'on' : ''}" data-v="${esc(x)}">${esc(sentenceCase(x))}</button>`).join('');
+      $$('button', box).forEach(c => c.onclick = () => { form.detail.value = up(form.detail.value) === c.dataset.v ? '' : c.dataset.v; live(); });
+    }
+    const r = read(), c = calc(r), pill = $('#profitPill');
+    pill.hidden = r.sellingPrice === null;
+    if (!pill.hidden) {
+      pill.className = 'profit-pill' + (c.profit < 0 ? ' neg' : '');
+      pill.textContent = `Profit: ${c.profit >= 0 ? '+' : '−'}${money(Math.abs(c.profit))} ${data.settings.currency || 'AED'} (${pct(c.margin) || '0%'})`;
+    }
+  };
+  form.addEventListener('input', live); form.addEventListener('change', live);
+  form.addEventListener('input', syncPickers); form.addEventListener('change', syncPickers); live(); syncPickers();
   $('#fullPaid').onclick = () => { form.amountPaid.value = form.sellingPrice.value; form.paymentStatus.value = 'PAID'; statusTouched = true; live(); };
 
   const save = (again) => {
@@ -675,6 +736,9 @@ async function renderSettings(v) {
   const info = await bridge.info();
   v.innerHTML = `
     <div class="card" style="margin-bottom:14px" id="syncCard"></div>
+    <div class="card" style="margin-bottom:14px"><h2>Theme</h2>
+      <div class="theme-opts">${THEMES.map(t => `<button class="theme-opt ${currentTheme() === t.id ? 'on' : ''}" data-theme-id="${t.id}"><span class="sw" style="background:${t.bg}"><b></b><i style="background:${t.accent}"></i></span>${t.name}</button>`).join('')}</div>
+    </div>
     <div class="card" style="margin-bottom:14px"><h2>Business</h2>
       <div class="form-grid" style="grid-template-columns:repeat(3,1fr)">
         <label class="field"><span>Company</span><input type="text" id="setCompany" value="${esc(data.settings.company)}"></label>
@@ -693,6 +757,7 @@ async function renderSettings(v) {
     </div>`;
 
   renderSyncCard();
+  $$('.theme-opt', v).forEach(b => b.onclick = () => { applyTheme(b.dataset.themeId); render(); });
   $('#sImport').onclick = doImport;
   $('#sExport').onclick = doExport;
   $('#sBackup').onclick = async () => { const p = await bridge.saveBackup(data); if (p) toast('Backup saved'); };
