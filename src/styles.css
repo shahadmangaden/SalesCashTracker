@@ -271,7 +271,7 @@ tr.sel td { background: var(--accent-soft); }
 
 /* =====================================================================
    Theme layer — same four themes as the phone app
-   (Cream & Ink · Navy & Lime · Black & Yellow · Crimson), Outfit typeface
+   (Cream & Ink · Navy & Lime · Black & Yellow), Outfit typeface
    ===================================================================== */
 @font-face { font-family: "Outfit"; font-weight: 400; font-display: swap; src: url("fonts/outfit-400.woff2") format("woff2"); }
 @font-face { font-family: "Outfit"; font-weight: 500; font-display: swap; src: url("fonts/outfit-500.woff2") format("woff2"); }
@@ -320,19 +320,6 @@ html[data-theme="black"] {
   --shadow-rgb: 0,0,0; --hilite: rgba(255,255,255,.03); --inset-hi: rgba(255,255,255,.04);
   --green: #4ade80; --green-soft: rgba(74,222,128,.14); --amber: #fbbf24; --amber-soft: rgba(251,191,36,.14); --red: #f87171; --red-soft: rgba(248,113,113,.14);
   color-scheme: dark;
-}
-html[data-theme="crimson"] {
-  --bg-1: #c81e5b; --bg-2: #a3123f; --glow: rgba(232,69,126,.5);
-  --on-bg: #ffffff; --on-bg-muted: rgba(255,255,255,.75);
-  --text: #2b2d42; --muted: #9a98aa;
-  --primary: #2b2d42; --on-primary: #ffffff;
-  --accent: #d81b60; --accent-2: #b0124b; --on-accent: #ffffff; --accent-soft: #fce4ee;
-  --card: #ffffff; --sheet: #fbf6f8; --field: #f6eef1;
-  --tile: #f7eef2; --line: #efe3e8; --track: #f3e6ec; --due: #c2410c;
-  --panel: #2b2d42; --panel-text: #ffffff; --panel-title: #ffb8cf; --panel-sub: #b9b8c8;
-  --side-active: #d81b60; --side-active-text: #ffffff;
-  --shadow-rgb: 90,10,42; --hilite: rgba(255,255,255,.5); --inset-hi: rgba(255,255,255,.8);
-  color-scheme: light;
 }
 
 body {

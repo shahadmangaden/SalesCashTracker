@@ -61,13 +61,12 @@ const THEMES = [
   { id: 'cream', name: 'Cream & Ink', bg: '#efebe4', card: '#ffffff', accent: '#f5c842' },
   { id: 'navy', name: 'Navy & Lime', bg: '#0a1120', card: '#16213a', accent: '#c6f16d' },
   { id: 'black', name: 'Black & Yellow', bg: '#0d0d0d', card: '#1c1c1c', accent: '#f5c842' },
-  { id: 'crimson', name: 'Crimson', bg: 'linear-gradient(180deg,#c81e5b,#a3123f)', card: '#ffffff', accent: '#ffffff' },
 ];
 function currentTheme() { let t; try { t = localStorage.getItem('theme'); } catch {} return THEMES.some(x => x.id === t) ? t : 'cream'; }
 function applyTheme(id) {
   document.documentElement.dataset.theme = id;
   try { localStorage.setItem('theme', id); } catch {}
-  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = { cream: '#efebe4', navy: '#0a1120', black: '#0d0d0d', crimson: '#c81e5b' }[id] || '#efebe4';
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = { cream: '#efebe4', navy: '#0a1120', black: '#0d0d0d' }[id] || '#efebe4';
 }
 applyTheme(currentTheme());
 
