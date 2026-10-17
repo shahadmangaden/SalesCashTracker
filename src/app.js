@@ -58,14 +58,16 @@ const SUB_PRODUCTS = {
 
 // ---------- Theme (shared look with the Android app) ----------
 const THEMES = [
-  { id: 'mustard', name: 'Mustard & charcoal', bg: 'linear-gradient(180deg,#f3ede0,#eeebe5)', accent: '#f5c542' },
-  { id: 'crimson', name: 'Crimson', bg: 'linear-gradient(180deg,#c81e5b,#a3123f)', accent: '#ffffff' },
+  { id: 'cream', name: 'Cream & Ink', bg: '#efebe4', card: '#ffffff', accent: '#f5c842' },
+  { id: 'navy', name: 'Navy & Lime', bg: '#0a1120', card: '#16213a', accent: '#c6f16d' },
+  { id: 'black', name: 'Black & Yellow', bg: '#0d0d0d', card: '#1c1c1c', accent: '#f5c842' },
+  { id: 'crimson', name: 'Crimson', bg: 'linear-gradient(180deg,#c81e5b,#a3123f)', card: '#ffffff', accent: '#ffffff' },
 ];
-function currentTheme() { try { return localStorage.getItem('theme') || 'mustard'; } catch { return 'mustard'; } }
+function currentTheme() { let t; try { t = localStorage.getItem('theme'); } catch {} return THEMES.some(x => x.id === t) ? t : 'cream'; }
 function applyTheme(id) {
   document.documentElement.dataset.theme = id;
   try { localStorage.setItem('theme', id); } catch {}
-  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = id === 'crimson' ? '#c81e5b' : '#eeebe5';
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = { cream: '#efebe4', navy: '#0a1120', black: '#0d0d0d', crimson: '#c81e5b' }[id] || '#efebe4';
 }
 applyTheme(currentTheme());
 
@@ -737,7 +739,7 @@ async function renderSettings(v) {
   v.innerHTML = `
     <div class="card" style="margin-bottom:14px" id="syncCard"></div>
     <div class="card" style="margin-bottom:14px"><h2>Theme</h2>
-      <div class="theme-opts">${THEMES.map(t => `<button class="theme-opt ${currentTheme() === t.id ? 'on' : ''}" data-theme-id="${t.id}"><span class="sw" style="background:${t.bg}"><b></b><i style="background:${t.accent}"></i></span>${t.name}</button>`).join('')}</div>
+      <div class="theme-opts">${THEMES.map(t => `<button class="theme-opt ${currentTheme() === t.id ? 'on' : ''}" data-theme-id="${t.id}"><span class="sw" style="background:${t.bg}"><b style="background:${t.card}"></b><i style="background:${t.accent}"></i></span>${t.name}</button>`).join('')}</div>
     </div>
     <div class="card" style="margin-bottom:14px"><h2>Business</h2>
       <div class="form-grid" style="grid-template-columns:repeat(3,1fr)">
