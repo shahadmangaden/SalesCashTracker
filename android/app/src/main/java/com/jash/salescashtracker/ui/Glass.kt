@@ -149,23 +149,7 @@ val Black = Palette(
     shadow = Color.Black, accentShadow = Color(0xFFF5C842),
 )
 
-val Crimson = Palette(
-    id = "crimson", name = "Crimson",
-    bg = listOf(Color(0xFFC81E5B), Color(0xFFA3123F)), glow = 0.35f, darkBg = true, darkCard = false,
-    onBg = Color.White, onBgMuted = Color.White.copy(alpha = 0.75f),
-    ink = Color(0xFF2B2D42), muted = Color(0xFF9A98AA),
-    primary = Color(0xFF2B2D42), onPrimary = Color.White,
-    accent = Color(0xFFD81B60), accent2 = Color(0xFFB0124B), onAccent = Color.White, onAccentSub = Color(0xFFFFD1E0), accentSoft = Color(0xFFFCE4EE),
-    card = Color.White, sheet = Color(0xFFFBF6F8), field = Color(0xFFF6EEF1),
-    tile = Color(0xFFF7EEF2), divider = Color(0xFFEFE3E8), track = Color(0xFFF3E6EC), ringFill = Color(0xFFD81B60), due = Color(0xFFC2410C),
-    panel = Color(0xFF2B2D42), panelEdge = Color(0xFF2B2D42), rowEdge = Color(0xFF3F4258), rowIcon = Color(0xFF3A3C54),
-    panelText = Color.White, panelTitle = Color(0xFFFFB8CF), panelSub = Color(0xFFB9B8C8),
-    navBg = Color.White.copy(alpha = 0.9f), navEdge = Color.White, navActiveBg = Color(0xFFD81B60).copy(alpha = 0.10f),
-    navActive = Color(0xFFD81B60), navIdle = Color(0xFF9A98AA),
-    shadow = Color(0xFF5A0A2A), accentShadow = Color(0xFF5A0A2A),
-)
-
-val Palettes = listOf(Cream, Navy, Black, Crimson)
+val Palettes = listOf(Cream, Navy, Black)
 
 /** The active theme; reading it inside composables recomposes them when the theme changes. */
 object ThemeState {
@@ -174,7 +158,7 @@ object ThemeState {
     var reduceMotion by androidx.compose.runtime.mutableStateOf(false)
     fun load(ctx: android.content.Context) {
         val id = ctx.getSharedPreferences("ui", android.content.Context.MODE_PRIVATE).getString("theme", null)
-        palette = Palettes.firstOrNull { it.id == id } ?: Cream   // older "mustard" -> Cream & Ink
+        palette = Palettes.firstOrNull { it.id == id } ?: Cream   // older "mustard" / "crimson" -> Cream & Ink
         reduceMotion = runCatching {
             android.provider.Settings.Global.getFloat(ctx.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
         }.getOrDefault(false)
