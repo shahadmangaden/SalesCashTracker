@@ -98,8 +98,8 @@ fun dayLabel(iso: String): String = runCatching {
 @Composable
 private fun DayHeader(day: String, total: String) {
     Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        T(dayLabel(day), 12.sp, Glass.OnBgMuted, FontWeight.SemiBold, Modifier.weight(1f))
-        T(total, 11.sp, Glass.OnBgMuted)
+        Caps(dayLabel(day), 12.sp, Glass.OnBg, 1.6.sp, Modifier.weight(1f))
+        T(total, 12.sp, Glass.OnBgMuted, FontWeight.SemiBold)
     }
 }
 
@@ -126,16 +126,25 @@ fun SalesScreen(state: AppState) {
     val t = Totals.of(rows, emptyList())
     val groups = rows.groupBy { it.date }
 
-    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) {
-                    PageHeading("Sales", "${state.periodLong} · ${t.count} ${if (t.count == 1) "sale" else "sales"} · ${cur(t.sales, code)}")
+            AccentHeader("Sales", state.periodLong, actions = { HeaderMonthButton(state) }) {
+                HeaderCard {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            T("Total sales · $code", 13.sp, Glass.Muted, FontWeight.SemiBold)
+                            T(amt(t.sales), 30.sp, Glass.Ink, FontWeight.Bold)
+                        }
+                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            T("Profit", 11.sp, Glass.Muted, FontWeight.SemiBold)
+                            T(amt(t.profit), 16.sp, Glass.Ink, FontWeight.Bold)
+                        }
+                    }
+                    T("${t.count} ${if (t.count == 1) "sale" else "sales"} · ${num(t.pax).ifBlank { "0" }} passengers", 12.sp, Glass.Muted)
                 }
-                PeriodMenuButton(state, R.drawable.lc_sliders_horizontal)
             }
         }
-        item { Box(Modifier.padding(top = 6.dp)) { GlassSearch(search, { search = it }, "Search customer, agent or product") } }
+        item { Box(Modifier.padding(top = 10.dp)) { GlassSearch(search, { search = it }, "Search customer, agent or product") } }
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (state.agentFilter.isNotBlank()) Choice("✕  ${nice(state.agentFilter)}", true, { state.agentFilter = "" }, large = true)
@@ -198,27 +207,21 @@ fun CashScreen(state: AppState) {
         YearMonth.parse(state.month).format(DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH))
     }.getOrDefault(state.month)
 
-    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { PageHeading("Cash", "Keep every payment accounted for") }
-                PeriodMenuButton(state, R.drawable.lc_history)
-            }
-        }
-        item {
-            Box(Modifier.padding(top = 6.dp)) {
-                GlassCard(spacing = 5.dp) {
-                    T("Cash paid · ${monthWord.replaceFirstChar { it.uppercase() }}", 13.sp, Glass.Muted)
-                    T(cur(total, code), 34.sp, Glass.Ink, FontWeight.Bold)
+            AccentHeader("Cash", state.periodLong, actions = { HeaderMonthButton(state) }) {
+                HeaderCard {
+                    T("Cash paid · ${monthWord.replaceFirstChar { it.uppercase() }} · $code", 13.sp, Glass.Muted, FontWeight.SemiBold)
+                    T(amt(total), 30.sp, Glass.Ink, FontWeight.Bold)
                     T("${period.size} ${if (period.size == 1) "payment" else "payments"} across $agents ${if (agents == 1) "agent" else "agents"}", 12.sp, Glass.Muted)
                 }
             }
         }
-        item { GlassSearch(search, { search = it }, "Search agent, mode or remarks") }
+        item { Box(Modifier.padding(top = 10.dp)) { GlassSearch(search, { search = it }, "Search agent, mode or remarks") } }
         item {
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                T("Recent payments", 13.sp, Glass.OnBg, FontWeight.SemiBold, Modifier.weight(1f))
-                T("Add payment", 12.sp, Glass.OnBg, modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { state.push(Route.EditCash(null)) })
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Caps("RECENT PAYMENTS", 13.sp, Glass.OnBg, modifier = Modifier.weight(1f))
+                T("+ Add payment", 13.sp, Glass.OnBg, FontWeight.SemiBold, Modifier.clip(RoundedCornerShape(8.dp)).clickable { state.push(Route.EditCash(null)) }.padding(4.dp))
             }
         }
         if (rows.isEmpty()) item {

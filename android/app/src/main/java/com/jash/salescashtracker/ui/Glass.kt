@@ -51,6 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -390,7 +392,7 @@ fun PageHeading(title: String, subtitle: String, @DrawableRes action: Int? = nul
 @Composable
 fun SectionHeading(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        T(title, 18.sp, Glass.OnBg, FontWeight.Bold, Modifier.weight(1f))
+        Caps(title.uppercase(java.util.Locale.ENGLISH), 13.sp, Glass.OnBg, modifier = Modifier.weight(1f))
         if (action != null) T(action, 12.sp, Glass.OnBg, FontWeight.SemiBold,
             if (onAction != null) Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onAction).padding(2.dp) else Modifier)
     }
@@ -915,4 +917,77 @@ fun Modifier.enter(index: Int): Modifier = composed {
     }
     val rise = with(androidx.compose.ui.platform.LocalDensity.current) { 12.dp.toPx() }
     this.graphicsLayer { alpha = p.value; translationY = (1f - p.value) * rise }
+}
+
+// ---------- Accent page header (matches Home) ----------
+
+/** Lets a header inside a padded list reach the screen edges. */
+fun Modifier.bleed(horizontal: Dp): Modifier = this.layout { m, c ->
+    val extra = (horizontal * 2).roundToPx()
+    val max = if (c.hasBoundedWidth) c.maxWidth + extra else c.maxWidth
+    val p = m.measure(c.copy(minWidth = max, maxWidth = max))
+    layout(p.width - extra, p.height) { p.place(-extra / 2, 0) }
+}
+
+/** Yellow (accent) header with rounded bottom corners: big title, subtitle, round buttons, then optional content (e.g. a white summary card). */
+@Composable
+fun AccentHeader(
+    title: String,
+    subtitle: String,
+    actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
+    content: (@Composable ColumnScope.() -> Unit)? = null,
+) {
+    val pal = ThemeState.palette
+    Column(
+        Modifier.fillMaxWidth().bleed(22.dp)
+            .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp)).background(pal.accent)
+            .statusBarsPadding().padding(start = 22.dp, end = 22.dp, top = 14.dp, bottom = if (content != null) 22.dp else 26.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                T(subtitle, 15.sp, pal.onAccentSub, FontWeight.Medium)
+                T(title, 32.sp, pal.onAccent, FontWeight.Bold)
+            }
+            actions()
+        }
+        if (content != null) content()
+    }
+}
+
+/** 44dp round button on the accent header. dark = filled with the ink colour (like the profile badge on Home). */
+@Composable
+fun HeaderButton(@DrawableRes icon: Int, description: String, dark: Boolean = false, onClick: () -> Unit) {
+    val pal = ThemeState.palette
+    Box(
+        Modifier.size(44.dp).pressable(onClick = onClick).clip(CircleShape)
+            .background(if (dark) pal.onAccent else Color.White.copy(alpha = 0.45f)),
+        contentAlignment = Alignment.Center,
+    ) { Lc(icon, if (dark) pal.accent else pal.onAccent, 20.dp, description = description) }
+}
+
+/** Header button that opens the month picker. */
+@Composable
+fun HeaderMonthButton(state: AppState) {
+    var open by remember { androidx.compose.runtime.mutableStateOf(false) }
+    Box {
+        HeaderButton(R.drawable.lc_calendar, "Choose month") { open = true }
+        MonthMenu(state, open) { open = false }
+    }
+}
+
+/** White summary card used inside the accent header. */
+@Composable
+fun HeaderCard(onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+    val pal = ThemeState.palette
+    val shape = RoundedCornerShape(24.dp)
+    Column(
+        Modifier.fillMaxWidth()
+            .shadow(10.dp, shape, ambientColor = pal.shadow.copy(alpha = 0.10f), spotColor = pal.shadow.copy(alpha = 0.16f))
+            .clip(shape).background(pal.card)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        content = content,
+    )
 }

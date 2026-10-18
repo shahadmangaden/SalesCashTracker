@@ -124,8 +124,8 @@ fun MainShell() {
     }
 
     val pal = ThemeState.palette
-    // Status bar icons: Home sits under the accent header, other tabs on the page backdrop
-    val overLight = if (state.tab == Tab.Home && top == null) pal.accent.luminance() > 0.5f else !pal.darkBg
+    // Status bar icons: every tab starts with the accent header
+    val overLight = if (top == null) pal.accent.luminance() > 0.5f else !pal.darkBg
     SystemBarIcons(darkContent = overLight, navDark = !pal.darkBg)
 
     CompositionLocalProvider(LocalCurrency provides settings.currency.ifBlank { "AED" }) {
@@ -135,7 +135,7 @@ fun MainShell() {
                 animationSpec = androidx.compose.animation.core.tween(if (ThemeState.reduceMotion) 0 else 220),
                 label = "tab",
             ) { tab ->
-                Box(Modifier.fillMaxSize().then(if (tab == Tab.Home) Modifier else Modifier.statusBarsPadding())) {
+                Box(Modifier.fillMaxSize()) {
                     when (tab) {
                         Tab.Home -> HomeScreen(state)
                         Tab.Sales -> SalesScreen(state)

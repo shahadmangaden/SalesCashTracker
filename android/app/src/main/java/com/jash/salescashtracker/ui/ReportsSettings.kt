@@ -79,16 +79,13 @@ fun ReportsScreen(state: AppState) {
     }.getOrDefault("")
     val periodWord = if (state.month == "all") "all-time" else "this month’s"
 
-    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item {
-            PageHeading("Reports", "A clearer view of your business", R.drawable.lc_download,
-                { exportCsv(ctx, bookings, cash, lists) }, "Export to Excel")
-        }
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { PeriodChip(state, long = true) }
-                T(range, 12.sp, Glass.OnBgMuted)
-            }
+            AccentHeader("Reports", listOf(state.periodLong, range).filter { it.isNotBlank() && it != "All time" }.distinct().joinToString(" · ").ifBlank { "All time" },
+                actions = {
+                    HeaderMonthButton(state)
+                    HeaderButton(R.drawable.lc_download, "Export to Excel", dark = true) { exportCsv(ctx, bookings, cash, lists) }
+                })
         }
         item {
             Segments(listOf("agents" to "Agents", "products" to "Products", "visas" to "Visa expiry"), state.reportsPage) { state.reportsPage = it }
@@ -335,23 +332,24 @@ fun SettingsScreen(state: AppState) {
     }
     fun open(url: String) = runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
 
-    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        item { PageHeading("Settings", "Make it work your way", R.drawable.lc_circle_help, { dialog = "help" }, "Help") }
+    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item {
-            GlassCard(padding = PaddingValues(17.dp), onClick = { dialog = "account" }) {
+          AccentHeader("Settings", "Make it work your way", actions = { HeaderButton(R.drawable.lc_circle_help, "Help") { dialog = "help" } }) {
+            HeaderCard(onClick = { dialog = "account" }) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
                     Box(
-                        Modifier.size(52.dp).clip(CircleShape).background(Glass.Yellow).border(1.dp, Glass.Edge, CircleShape),
+                        Modifier.size(52.dp).clip(CircleShape).background(Glass.Charcoal),
                         contentAlignment = Alignment.Center,
-                    ) { T(initials(settings.user.ifBlank { user?.email ?: "" }), 19.sp, Glass.OnAccent, FontWeight.Bold) }
+                    ) { T(initials(settings.user.ifBlank { user?.email ?: "" }), 19.sp, Glass.OnPrimary, FontWeight.Bold) }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         T(nice(settings.user).ifBlank { "Your account" }, 18.sp, Glass.Ink, FontWeight.Bold)
                         T(user?.email ?: "", 11.sp, Glass.Muted)
-                        T("Manage account", 11.sp, Glass.Blue, FontWeight.SemiBold)
+                        T("Manage account", 11.sp, Glass.Ink, FontWeight.SemiBold)
                     }
                     Lc(R.drawable.lc_chevron_right, Glass.Muted, 18.dp)
                 }
             }
+          }
         }
         item {
             GlassCard(padding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
