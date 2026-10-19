@@ -10,4 +10,6 @@ contextBridge.exposeInMainWorld('api', {
   saveBackup: data => ipcRenderer.invoke('backup:save', data),
   restoreBackup: () => ipcRenderer.invoke('backup:restore'),
   confirm: (message, detail) => ipcRenderer.invoke('app:confirm', message, detail),
+  titleBar: (bg, fg) => ipcRenderer.send('win:theme', { bg, fg }),
+  desktop: true,
 });

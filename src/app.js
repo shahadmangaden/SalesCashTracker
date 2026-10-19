@@ -63,8 +63,15 @@ const THEMES = [
   { id: 'black', name: 'Black & Yellow', bg: '#0d0d0d', card: '#1c1c1c', accent: '#f5c842' },
 ];
 function currentTheme() { let t; try { t = localStorage.getItem('theme'); } catch {} return THEMES.some(x => x.id === t) ? t : 'cream'; }
+const TITLEBAR = { cream: ['#efebe4', '#1c1b19'], navy: ['#0a1120', '#f3f6fb'], black: ['#0d0d0d', '#f5f3ee'] };
 function applyTheme(id) {
   document.documentElement.dataset.theme = id;
+  // Windows app: our own title bar (no menu bar); tell the window to colour its buttons to match
+  if (window.api && window.api.desktop) {
+    document.documentElement.classList.add('desktop');
+    const [bg, fg] = TITLEBAR[id] || TITLEBAR.cream;
+    try { window.api.titleBar(bg, fg); } catch {}
+  }
   try { localStorage.setItem('theme', id); } catch {}
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = { cream: '#efebe4', navy: '#0a1120', black: '#0d0d0d' }[id] || '#efebe4';
 }
@@ -209,7 +216,13 @@ function render() {
   $('#brandUser').textContent = (data.settings.user ? data.settings.user + ' · ' : '') + 'Sales & Cash Tracker';
   updateExpiryBadge();
   const v = $('#view');
-  if (!data.bookings.length && !data.cash.length && ui.view === 'dashboard') { v.innerHTML = welcomeHTML(); bindWelcome(); return; }
+  const empty = !data.bookings.length && !data.cash.length;
+  // Nothing to filter yet: mute the Period picker
+  $('#monthFilter').disabled = empty;
+  $('#monthPick').classList.toggle('disabled', empty);
+  $('#monthPick').title = empty ? 'Add a sale or cash entry to filter by month' : '';
+  v.classList.toggle('empty-canvas', empty && ui.view === 'dashboard');
+  if (empty && ui.view === 'dashboard') { v.innerHTML = welcomeHTML(); bindWelcome(); return; }
   ({ dashboard: renderDashboard, bookings: renderBookings, cash: renderCash, ledger: renderLedger, expiry: renderExpiry, settings: renderSettings })[ui.view](v);
 }
 
@@ -881,7 +894,12 @@ function renderAccountBox() {
     box.innerHTML = `<button class="btn block ghost-light" id="accSignIn">👤 Sign in to sync</button>`;
     $('#accSignIn').onclick = showAuth;
   } else {
-    box.innerHTML = `<div class="acc-email" title="${esc(syncInfo.email)}">👤 ${esc(syncInfo.email)}</div><button class="acc-out" id="accOut">Sign out</button>`;
+    const email = syncInfo.email || '';
+    const name = (data.settings.user || '').trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) || email.split('@')[0];
+    const ini = (name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('') || '?').toUpperCase();
+    box.innerHTML = `<div class="avatar" aria-hidden="true">${esc(ini)}</div>
+      <div class="acc-txt"><div class="acc-name" title="${esc(name)}">${esc(name)}</div><div class="acc-email" title="${esc(email)}">${esc(email)}</div></div>
+      <button class="acc-out" id="accOut" title="Sign out" aria-label="Sign out"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg></button>`;
     $('#accOut').onclick = async () => {
       if (await confirmBox('Sign out?', 'Records stay on this device. Sign in again to keep syncing.', 'Sign out')) { authSkipped = false; await bridge.sync.signOut(); }
     };
@@ -1046,13 +1064,14 @@ async function boot() {
   if (window.apiReady) { try { bridge = (await window.apiReady) || bridge; } catch (e) { console.error('Sync unavailable', e); } }
   data = normalize(await bridge.load());
   const info = await bridge.info();
-  $('#sideFoot').innerHTML = `${IS_WEB ? 'Web' : 'Desktop'} v${esc(info.version)} · Ctrl+N new sale<br>Data saves automatically`;
+  $('#sideFoot').innerHTML = `${IS_WEB ? 'Web' : 'Desktop'} v${esc(info.version)} · Data saves automatically<br><kbd>Ctrl</kbd>+<kbd>N</kbd> new sale`;
   setupSync();
   $$('#nav button').forEach(b => b.onclick = () => go(b.dataset.view));
   $('#monthFilter').onchange = e => { ui.month = e.target.value; render(); };
   $('#search').oninput = e => { ui.search = e.target.value; render(); $('#search').focus(); };
   $('#sideAddBooking').onclick = () => openBookingForm();
   $('#sideAddCash').onclick = () => openCashForm();
+  $('#topSettings').onclick = () => go('settings');
   $('#fab').onclick = () => (ui.view === 'cash' ? openCashForm() : openBookingForm());
   go('dashboard');
 }

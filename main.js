@@ -54,7 +54,10 @@ function createWindow() {
     minHeight: 640,
     title: 'Sales & Cash Tracker',
     icon: path.join(__dirname, '..', 'build', 'icon.png'),
-    backgroundColor: '#f4f6fa',
+    backgroundColor: '#efebe4',
+    // Our own title bar: the page draws the app name, Windows draws the min/max/close buttons on top
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#efebe4', symbolColor: '#1c1b19', height: 40 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -65,13 +68,29 @@ function createWindow() {
   win.maximize();
   win.loadFile(path.join(__dirname, '..', 'src', 'index.html'));
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  // No menu bar, so keep the handy shortcuts here (Ctrl+N etc. are handled inside the page)
+  win.webContents.on('before-input-event', (e, input) => {
+    if (input.type !== 'keyDown') return;
+    const k = input.key.toLowerCase();
+    const ctrl = input.control || input.meta;
+    if (k === 'f5' || (ctrl && k === 'r')) { win.webContents.reload(); e.preventDefault(); }
+    else if (ctrl && input.shift && k === 'i') { win.webContents.toggleDevTools(); e.preventDefault(); }
+    else if (k === 'f11') { win.setFullScreen(!win.isFullScreen()); e.preventDefault(); }
+    else if (ctrl && (k === '=' || k === '+')) { win.webContents.setZoomLevel(win.webContents.getZoomLevel() + 0.5); e.preventDefault(); }
+    else if (ctrl && k === '-') { win.webContents.setZoomLevel(win.webContents.getZoomLevel() - 0.5); e.preventDefault(); }
+    else if (ctrl && k === '0') { win.webContents.setZoomLevel(0); e.preventDefault(); }
+  });
 }
 
-Menu.setApplicationMenu(Menu.buildFromTemplate([
-  { label: 'File', submenu: [{ role: 'reload', label: 'Reload' }, { type: 'separator' }, { role: 'quit', label: 'Exit' }] },
-  { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
-  { label: 'View', submenu: [{ role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'resetZoom' }, { type: 'separator' }, { role: 'togglefullscreen' }, { role: 'toggleDevTools' }] },
-]));
+// Title bar colours follow the chosen theme
+ipcMain.on('win:theme', (_e, c) => {
+  if (!win || !c) return;
+  try { win.setTitleBarOverlay({ color: c.bg, symbolColor: c.fg, height: 40 }); } catch (_) { /* not supported on this OS */ }
+  win.setBackgroundColor(c.bg);
+});
+
+// No File / Edit / View menu bar (editing shortcuts like Ctrl+C / Ctrl+V still work in text boxes)
+Menu.setApplicationMenu(null);
 
 ipcMain.handle('data:load', () => readData());
 ipcMain.handle('data:save', (_e, data) => writeData(data));

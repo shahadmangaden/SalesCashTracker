@@ -456,3 +456,55 @@ tr.sel td { background: var(--accent-soft); }
   .modal { border-radius: 0; }
   .tiles { grid-template-columns: 1fr 1fr; }
 }
+
+/* ---------- Desktop window: custom title bar (no menu bar) ---------- */
+.titlebar { display: none; }
+html.desktop .titlebar {
+  display: flex; align-items: center; gap: 10px; position: fixed; top: 0; left: 0; right: 0; height: 40px; z-index: 30;
+  padding: 0 150px 0 16px; background: var(--bg-1); color: var(--on-bg); font-size: 13px; font-weight: 600;
+  -webkit-app-region: drag; user-select: none;
+}
+html.desktop .tb-logo { width: 20px; height: 20px; border-radius: 6px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-size: 11px; font-weight: 800; }
+html.desktop body { padding-top: 40px; box-sizing: border-box; }
+html.desktop .modal-back, html.desktop .auth-screen { top: 40px; }
+html.desktop .sidebar { margin-top: 4px; }
+
+/* ---------- Layers: nothing overlaps the header ---------- */
+.sidebar { position: relative; z-index: 3; }
+main { position: relative; z-index: 1; }
+.topbar { position: relative; z-index: 2; align-items: center; min-height: 72px; }
+.topbar h1 { line-height: 1.15; margin: 0; }
+.top-controls { align-items: center; }
+.month-pick { gap: 8px; }
+.month-pick.disabled { opacity: .45; cursor: not-allowed; }
+.month-pick.disabled select { cursor: not-allowed; }
+.icon-btn { all: unset; cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--card); color: var(--text);
+  box-shadow: 4px 4px 10px rgba(var(--shadow-rgb), .12); }
+.icon-btn:hover { filter: brightness(1.08); }
+.icon-btn:focus-visible { outline: 2px solid var(--accent); }
+
+/* ---------- Sidebar rhythm & profile ---------- */
+.sidebar { display: flex; flex-direction: column; padding: 18px 14px 14px; }
+nav { gap: 4px; margin-top: 16px; }
+nav button { min-height: 42px; box-sizing: border-box; }
+.side-actions { margin-top: 20px; gap: 10px; }
+.side-actions .btn { min-height: 42px; }
+.account-box { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 6px 10px; border-top: 1px solid rgba(255,255,255,.08); }
+.account-box .avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 800; font-size: 13px; letter-spacing: .3px; }
+.acc-txt { flex: 1; min-width: 0; }
+.acc-name { color: var(--panel-text); font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-box .acc-email { color: var(--panel-sub); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
+.account-box .acc-out { all: unset; cursor: pointer; flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--panel-sub); opacity: 1; }
+.account-box .acc-out:hover, .account-box .acc-out:focus-visible { background: rgba(255,255,255,.1); color: var(--panel-text); }
+.side-foot { color: var(--panel-sub); opacity: 1; font-size: 11.5px; line-height: 1.6; padding: 8px 6px 0; }
+.side-foot kbd { font-family: inherit; font-size: 10.5px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; padding: 0 4px; }
+
+/* ---------- Empty dashboard: centred card over a faint dashboard sketch ---------- */
+#view.empty-canvas { display: grid; place-items: center; position: relative; overflow: hidden; }
+#view.empty-canvas::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .4;
+  background:
+    radial-gradient(520px 320px at 50% 50%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='980' height='560' viewBox='0 0 980 560' fill='none' stroke='%23888' stroke-opacity='.35' stroke-width='1.5'%3E%3Crect x='1' y='1' width='300' height='220' rx='12'/%3E%3Crect x='16' y='16' width='60' height='14' rx='4'/%3E%3Crect x='16' y='48' width='268' height='30' rx='6'/%3E%3Cpath d='M16 100h268M16 130h268M16 160h268M16 190h268M100 92v120M190 92v120'/%3E%3Crect x='679' y='1' width='300' height='220' rx='12'/%3E%3Cpath d='M679 1l300 220M979 1L679 221'/%3E%3Crect x='1' y='300' width='460' height='258' rx='12'/%3E%3Cpath d='M30 520l70-60 70 30 70-90 70 40 70-70 70 30'/%3E%3Cpath d='M30 530h400'/%3E%3Crect x='519' y='300' width='460' height='258' rx='12'/%3E%3Ccircle cx='640' cy='430' r='70'/%3E%3Cpath d='M740 390h200M740 420h170M740 450h190M740 480h140'/%3E%3C/svg%3E") center / min(980px, 92%) auto no-repeat;
+}
+#view.empty-canvas .welcome { position: relative; z-index: 1; margin: 0; max-width: 680px; backdrop-filter: blur(6px); box-shadow: 0 24px 60px rgba(var(--shadow-rgb), .25); }
