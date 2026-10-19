@@ -485,53 +485,54 @@ function openBookingForm(b, isCopy) {
   const L = data.lists;
   const agents = [...new Set([...L.agents, ...data.bookings.map(x => x.agent).filter(Boolean)])].sort();
   const details = [...new Set([...data.bookings.map(x => x.detail).filter(Boolean), ...Object.values(SUB_PRODUCTS).flat()])].sort();
-  const f = (label, html, cls = '', req) => `<label class="field ${cls}"><span>${label}${req ? ' <i class="req">*</i>' : ''}</span>${html}</label>`;
+  const f = (label, html, cls = '', req) => `<label class="field ${cls}"><span>${label}${req ? ' <i class="req" aria-hidden="true">*</i>' : ''}</span>${html}${req ? '<em class="err">Required</em>' : ''}</label>`;
   const val = k => esc(b[k] ?? '');
+  const sec = (title, sub) => `<div class="fsec c12"><h4>${title}</h4>${sub ? `<span>${sub}</span>` : ''}</div>`;
   openModal(`
-    <div class="modal-head"><h3>${isNew ? (isCopy ? 'New Sale (copied)' : 'New Sale / Booking') : 'Edit Booking'}</h3><button class="x" data-close>×</button></div>
-    <form class="modal-body" id="bForm" autocomplete="off">
-      <div class="form-grid">
-        <div class="section-label">Customer &amp; Product</div>
-        ${f('T. Date', `<input type="date" name="date" value="${b.date || todayISO()}" required>`, '', 1)}
-        ${f('Customer Name', `<input type="text" name="customer" value="${val('customer')}" required>`, 'span2', 1)}
-        ${f('Customer Type', selectHTML('customerType', L.customerTypes, b.customerType))}
-        ${f('Agency / Sub-Agent Name', datalistInput('agent', agents, b.agent, 'dlAgents'), 'span2')}
-        ${f('Product Category', selectHTML('category', L.categories, b.category), 'hide')}
-        <div class="picker"><span class="picker-label">Product</span><div class="tiles" id="prodTiles">${L.categories.map(c => `<button type="button" class="tile" data-v="${esc(c)}"><span class="ico">${productEmoji(c)}</span><span class="nm">${esc(sentenceCase(c))}</span></button>`).join('')}</div>
-          <div class="subs" id="subChips"></div></div>
-        ${f('Contact', `<input type="text" name="contact" value="${val('contact')}">`)}
-        ${f('Product / Service Detail', datalistInput('detail', details, b.detail, 'dlDetails'), 'span2')}
-        ${f('Sector / Destination', datalistInput('sector', L.countries, b.sector, 'dlSector'))}
-        ${f('No. of Pax', `<input type="number" name="pax" min="0" step="1" value="${b.pax ?? 1}">`)}
-        ${f('Flights / Ref', `<input type="text" name="ref" value="${val('ref')}">`)}
-        ${f('PNR', `<input type="text" name="pnr" value="${val('pnr')}">`)}
-        ${f('Service / Travel Date', `<input type="date" name="serviceDate" value="${b.serviceDate || ''}">`)}
-        ${f('Booking Status', selectHTML('bookingStatus', L.bookingStatuses, b.bookingStatus))}
+    <div class="modal-head"><h3>${isNew ? (isCopy ? 'New Sale (copied)' : 'New Sale / Booking') : 'Edit Booking'}</h3><button class="x" data-close aria-label="Close">×</button></div>
+    <form class="modal-body sale-form" id="bForm" autocomplete="off" novalidate>
+      <div class="g12">
+        ${sec('Customer Details', '<i class="req">*</i> required')}
+        ${f('Date', `<input type="date" name="date" value="${b.date || todayISO()}" required>`, 'c3', 1)}
+        ${f('Customer Name', `<input type="text" name="customer" value="${val('customer')}" required placeholder="Full name">`, 'c6', 1)}
+        ${f('Customer Type', selectHTML('customerType', L.customerTypes, b.customerType), 'c3')}
+        ${f('Agency / Sub-Agent', datalistInput('agent', agents, b.agent, 'dlAgents'), 'c6')}
+        ${f('Contact', `<input type="text" name="contact" value="${val('contact')}" placeholder="Phone or email">`, 'c6')}
 
-        <div class="section-label">Price &amp; Payment</div>
-        ${f('Net Cost', `<input type="number" name="netCost" step="0.01" value="${b.netCost ?? ''}">`)}
-        ${f('Selling Price', `<input type="number" name="sellingPrice" step="0.01" value="${b.sellingPrice ?? ''}">`)}
-        ${f('Profit', `<div class="calc" id="cProfit"></div>`)}
-        ${f('Profit %', `<div class="calc" id="cMargin"></div>`)}
-        <div class="picker"><span class="profit-pill" id="profitPill" hidden></span>
-          <span class="picker-label">Payment status</span>
+        ${sec('Booking Details')}
+        ${f('Product Category', selectHTML('category', L.categories, b.category), 'hide')}
+        <div class="picker c12"><span class="picker-label">Product</span>
+          <div class="pills" id="prodTiles" role="radiogroup" aria-label="Product">${L.categories.map(c => `<button type="button" class="popt" role="radio" data-v="${esc(c)}"><span class="pi">${productEmoji(c)}</span>${esc(sentenceCase(c))}</button>`).join('')}</div>
+          <div class="subs" id="subChips"></div></div>
+        ${f('Product / Service Detail', datalistInput('detail', details, b.detail, 'dlDetails'), 'c6')}
+        ${f('Sector / Destination', datalistInput('sector', L.countries, b.sector, 'dlSector'), 'c6')}
+        ${f('No. of Pax', `<input type="number" name="pax" min="0" step="1" value="${b.pax ?? 1}">`, 'c2')}
+        ${f('Flights / Ref', `<input type="text" name="ref" value="${val('ref')}">`, 'c4')}
+        ${f('PNR', `<input type="text" name="pnr" value="${val('pnr')}">`, 'c3')}
+        ${f('Service / Travel Date', `<input type="date" name="serviceDate" value="${b.serviceDate || ''}">`, 'c3')}
+        ${f('Booking Status', selectHTML('bookingStatus', L.bookingStatuses, b.bookingStatus), 'c3')}
+        ${f('Visa / Doc Type', selectHTML('docType', L.docTypes.map(d => d.name), b.docType), 'c3')}
+        ${f('Entry Date', `<input type="date" name="entryDate" value="${b.entryDate || ''}">`, 'c2')}
+        ${f('Expires', `<div class="calc" id="cExp"></div>`, 'c2 half')}
+        ${f('Days Left', `<div class="calc" id="cLeft"></div>`, 'c2 half')}
+
+        ${sec('Financials &amp; Payment')}
+        ${f('Net Cost', `<input type="number" name="netCost" step="0.01" value="${b.netCost ?? ''}" placeholder="0.00">`, 'c3')}
+        ${f('Selling Price', `<input type="number" name="sellingPrice" step="0.01" value="${b.sellingPrice ?? ''}" placeholder="0.00">`, 'c3')}
+        ${f('Profit', `<div class="calc" id="cProfit"></div>`, 'c3 half')}
+        ${f('Profit %', `<div class="calc" id="cMargin"></div>`, 'c3 half')}
+        <div class="picker c12"><div class="picker-row"><span class="picker-label">Payment status</span><span class="profit-pill" id="profitPill" hidden></span></div>
           <div class="seg" id="paySeg">
             <button type="button" data-v="PAID"><i style="background:var(--green)"></i>Paid in Full</button>
             <button type="button" data-v="PARTIAL"><i style="background:#f59e0b"></i>Partial Payment</button>
             <button type="button" data-v="PENDING"><i style="background:var(--red)"></i>Awaiting Payment</button>
           </div></div>
-        ${f('Amount Paid', `<input type="number" name="amountPaid" step="0.01" value="${b.amountPaid ?? ''}">`)}
+        ${f('Amount Paid', `<input type="number" name="amountPaid" step="0.01" value="${b.amountPaid ?? ''}" placeholder="0.00">`, 'c4')}
+        ${f('Balance Due', `<div class="calc" id="cBal"></div>`, 'c4')}
+        <div class="c4 fp-wrap"><button type="button" class="btn block" id="fullPaid">Mark fully paid</button></div>
         ${f('Payment Status', selectHTML('paymentStatus', L.paymentStatuses, b.paymentStatus), 'hide')}
         ${f('Payment Mode', selectHTML('paymentMode', L.paymentModes, b.paymentMode), 'hide')}
-        <div class="picker"><span class="picker-label">Payment mode</span><div class="tiles modes" id="modeTiles">${L.paymentModes.map(m => { const [e, n] = MODE_LABEL[m] || ['💰', sentenceCase(m)]; return `<button type="button" class="tile" data-v="${esc(m)}"><span class="ico">${e}</span><span class="nm">${esc(n)}</span></button>`; }).join('')}</div></div>
-        ${f('Balance Due', `<div class="calc" id="cBal"></div>`)}
-        <div class="span4"><button type="button" class="btn small" id="fullPaid">Mark fully paid</button> <span class="muted" style="font-size:12px">Payment status updates automatically from the amount paid unless you choose one.</span></div>
-
-        <div class="section-label">Visa / Document</div>
-        ${f('Visa / Doc Type', selectHTML('docType', L.docTypes.map(d => d.name), b.docType))}
-        ${f('Entry Date', `<input type="date" name="entryDate" value="${b.entryDate || ''}">`)}
-        ${f('Expire Date', `<div class="calc" id="cExp"></div>`)}
-        ${f('Days to Expiry', `<div class="calc" id="cLeft"></div>`)}
+        <div class="picker c12"><span class="picker-label">Payment mode</span><div class="pills modes" id="modeTiles">${L.paymentModes.map(m => { const [e, n] = MODE_LABEL[m] || ['💰', sentenceCase(m)]; return `<button type="button" class="popt" data-v="${esc(m)}"><span class="pi">${e}</span>${esc(n)}</button>`; }).join('')}</div></div>
       </div>
     </form>
     <div class="modal-foot">
@@ -539,7 +540,7 @@ function openBookingForm(b, isCopy) {
       <button class="btn" data-close>Cancel</button>
       ${isNew ? '<button class="btn" id="bSaveNew">Save &amp; add another</button>' : ''}
       <button class="btn primary" id="bSave">Save</button>
-    </div>`);
+    </div>`, 'wide');
 
   const form = $('#bForm');
   let statusTouched = !!b.paymentStatus && !isNew;
@@ -570,8 +571,8 @@ function openBookingForm(b, isCopy) {
   };
   // Quick pickers: tiles / segmented control drive the (hidden) selects so saving works as before
   const pick = (name, v) => { form[name].value = v; form[name].dispatchEvent(new Event('change', { bubbles: true })); };
-  $$('#prodTiles .tile').forEach(t => t.onclick = () => { if (form.category.value !== t.dataset.v) form.detail.value = ''; pick('category', t.dataset.v); });
-  $$('#modeTiles .tile').forEach(t => t.onclick = () => pick('paymentMode', t.dataset.v));
+  $$('#prodTiles .popt').forEach(t => t.onclick = () => { if (form.category.value !== t.dataset.v) form.detail.value = ''; pick('category', t.dataset.v); });
+  $$('#modeTiles .popt').forEach(t => t.onclick = () => pick('paymentMode', t.dataset.v));
   $$('#paySeg button').forEach(bt => bt.onclick = () => {
     statusTouched = true;
     const v = bt.dataset.v;
@@ -581,8 +582,8 @@ function openBookingForm(b, isCopy) {
     if (v === 'PARTIAL') form.amountPaid.focus();
   });
   const syncPickers = () => {
-    $$('#prodTiles .tile').forEach(t => t.classList.toggle('on', t.dataset.v === form.category.value));
-    $$('#modeTiles .tile').forEach(t => t.classList.toggle('on', t.dataset.v === form.paymentMode.value));
+    $$('#prodTiles .popt').forEach(t => { const on = t.dataset.v === form.category.value; t.classList.toggle('on', on); t.setAttribute('aria-checked', on); });
+    $$('#modeTiles .popt').forEach(t => t.classList.toggle('on', t.dataset.v === form.paymentMode.value));
     $$('#paySeg button').forEach(bt => bt.classList.toggle('on', bt.dataset.v === form.paymentStatus.value));
     const subs = SUB_PRODUCTS[up(form.category.value)] || [];
     const box = $('#subChips');
@@ -600,11 +601,14 @@ function openBookingForm(b, isCopy) {
   };
   form.addEventListener('input', live); form.addEventListener('change', live);
   form.addEventListener('input', syncPickers); form.addEventListener('change', syncPickers); live(); syncPickers();
+  // Required fields: flag on blur, clear as soon as something is typed
+  const checkReq = el => { const bad = !String(el.value).trim(); el.closest('.field').classList.toggle('invalid', bad); el.setAttribute('aria-invalid', bad); return !bad; };
+  $$('[required]', form).forEach(el => { el.addEventListener('blur', () => checkReq(el)); el.addEventListener('input', () => { if (el.value.trim()) checkReq(el); }); });
   $('#fullPaid').onclick = () => { form.amountPaid.value = form.sellingPrice.value; form.paymentStatus.value = 'PAID'; statusTouched = true; live(); };
 
   const save = (again) => {
     const r = read();
-    if (!r.date || !r.customer) { toast('Date and customer name are required', true); (r.date ? form.customer : form.date).focus(); return; }
+    if (!r.date || !r.customer) { checkReq(form.date); checkReq(form.customer); toast('Date and customer name are required', true); (r.date ? form.customer : form.date).focus(); return; }
     if (isNew) { data.bookings.push({ id: uid(), ...r, createdAt: new Date().toISOString() }); }
     else Object.assign(data.bookings.find(x => x.id === b.id), r, { updatedAt: new Date().toISOString() });
     if (r.agent && !data.lists.agents.includes(r.agent)) data.lists.agents.push(r.agent);
@@ -1024,7 +1028,7 @@ function renderSyncCard() {
 // ---------- Modal helpers ----------
 function openModal(html, narrow) {
   const m = $('#modal');
-  m.className = 'modal' + (narrow ? ' narrow' : '');
+  m.className = 'modal' + (narrow === 'wide' ? ' wide' : narrow ? ' narrow' : '');
   m.innerHTML = html; $('#modalBack').hidden = false;
   $$('[data-close]', m).forEach(b => b.onclick = closeModal);
 }
