@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -68,13 +70,14 @@ enum class Tab(val label: String, @DrawableRes val icon: Int) {
     Sales("Sales", R.drawable.lc_tickets_plane),
     Cash("Cash", R.drawable.lc_wallet),
     Reports("Reports", R.drawable.lc_chart_no_axes_combined),
-    Settings("Settings", R.drawable.lc_settings_2),
 }
 
 sealed class Route {
     data class EditSale(val booking: Booking?, val isCopy: Boolean = false, val nonce: Long = System.nanoTime()) : Route()
     data class EditCash(val entry: CashEntry?, val nonce: Long = System.nanoTime()) : Route()
     data object QuickAdd : Route()
+    /** Full-screen Settings page, opened from the initials button on every screen. */
+    data object Settings : Route()
 }
 
 /** UI-wide state shared by the tabs. */
@@ -104,11 +107,12 @@ class AppState {
 fun AppRoot() {
     val user by Repository.user.collectAsStateWithLifecycle()
     val sync by Repository.sync.collectAsStateWithLifecycle()
+    SystemBarIcons(darkContent = true, navDark = true)   // all three themes are light
     when {
         sync == SyncState.Checking -> GlassBackground {
             CircularProgressIndicator(Modifier.align(Alignment.Center), color = Glass.Blue)
         }
-        user == null -> { SystemBarIcons(darkContent = !ThemeState.palette.darkBg, navDark = !ThemeState.palette.darkBg); AuthScreen() }
+        user == null -> AuthScreen()
         else -> MainShell()
     }
 }
@@ -118,18 +122,15 @@ fun MainShell() {
     val state = remember { AppState() }
     val settings by Repository.settings.collectAsStateWithLifecycle()
     val top = state.routes.lastOrNull()
+    val settingsOpen = state.routes.any { it == Route.Settings }
+    val sheet = top?.takeIf { it != Route.Settings }
 
     BackHandler(enabled = top != null || state.tab != Tab.Home) {
         if (top != null) state.pop() else state.tab = Tab.Home
     }
 
-    val pal = ThemeState.palette
-    // Status bar icons: every tab starts with the accent header
-    val overLight = if (top == null) pal.accent.luminance() > 0.5f else !pal.darkBg
-    SystemBarIcons(darkContent = overLight, navDark = !pal.darkBg)
-
     CompositionLocalProvider(LocalCurrency provides settings.currency.ifBlank { "AED" }) {
-        GlassBackground {
+        Box(Modifier.fillMaxSize().background(ThemeState.palette.bg.first())) {
             androidx.compose.animation.Crossfade(
                 targetState = state.tab,
                 animationSpec = androidx.compose.animation.core.tween(if (ThemeState.reduceMotion) 0 else 220),
@@ -141,84 +142,43 @@ fun MainShell() {
                         Tab.Sales -> SalesScreen(state)
                         Tab.Cash -> CashScreen(state)
                         Tab.Reports -> ReportsScreen(state)
-                        Tab.Settings -> SettingsScreen(state)
                     }
                 }
             }
 
-            FloatingNav(state, Modifier.align(Alignment.BottomCenter))
+            IosTabBar(state, Modifier.align(Alignment.BottomCenter))
+
+            // Settings: pushed page that slides in from the right (iOS navigation)
+            AnimatedVisibility(
+                visible = settingsOpen,
+                enter = if (ThemeState.reduceMotion) fadeIn() else slideInHorizontally(androidx.compose.animation.core.tween(320)) { it },
+                exit = if (ThemeState.reduceMotion) fadeOut() else slideOutHorizontally(androidx.compose.animation.core.tween(260)) { it },
+            ) { SettingsScreen(state) }
 
             // Sheets
-            AnimatedVisibility(visible = top != null, enter = fadeIn(), exit = fadeOut()) {
+            AnimatedVisibility(visible = sheet != null, enter = fadeIn(), exit = fadeOut()) {
                 Box(
-                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (pal.darkCard) 0.5f else 0.28f))
+                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f))
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { state.pop() },
                 )
             }
             AnimatedVisibility(
-                visible = top != null,
-                // Standard navigation timing (~300 ms), gentle spring, no bounce; fade only with Reduce Motion
+                visible = sheet != null,
                 enter = if (ThemeState.reduceMotion) fadeIn() else slideInVertically(androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = 500f)) { it },
                 exit = if (ThemeState.reduceMotion) fadeOut() else slideOutVertically(androidx.compose.animation.core.tween(240)) { it },
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
-                val r = top
+                val r = sheet
                 if (r != null) key(r) {
                     when (r) {
                         is Route.EditSale -> SaleSheet(r.booking, r.isCopy, state)
                         is Route.EditCash -> CashSheet(r.entry, state)
                         Route.QuickAdd -> QuickAddSheet(state)
+                        Route.Settings -> {}
                     }
                 }
             }
         }
-    }
-}
-
-/** Floating glass tab bar from the mockups: 64dp pill, active item in a 52dp capsule, round accent + button. */
-@Composable
-private fun FloatingNav(state: AppState, modifier: Modifier) {
-    val pal = ThemeState.palette
-    val pill = RoundedCornerShape(32.dp)
-    Row(
-        modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 12.dp).height(64.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(
-            Modifier.weight(1f).fillMaxHeight()
-                .shadow(if (pal.darkCard) 18.dp else 14.dp, pill, ambientColor = pal.shadow.copy(alpha = 0.16f), spotColor = pal.shadow.copy(alpha = if (pal.darkCard) 0.5f else 0.2f))
-                .clip(pill).background(pal.navBg)
-                .border(1.dp, pal.navEdge, pill).padding(horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Tab.entries.forEach { t ->
-                val on = state.tab == t
-                val bg by androidx.compose.animation.animateColorAsState(
-                    if (on) pal.navActiveBg else Color.Transparent, androidx.compose.animation.core.tween(200), label = "navbg",
-                )
-                val fg by androidx.compose.animation.animateColorAsState(
-                    if (on) pal.navActive else pal.navIdle, androidx.compose.animation.core.tween(200), label = "navfg",
-                )
-                Column(
-                    Modifier.weight(1f).height(52.dp).pressable(scaleTo = 0.92f) { state.tab = t }
-                        .semantics { selected = on }
-                        .clip(RoundedCornerShape(26.dp)).background(bg),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
-                ) {
-                    Lc(t.icon, fg, 22.dp, description = null)
-                    T(t.label, 11.sp, fg, if (on) FontWeight.Bold else FontWeight.SemiBold)
-                }
-            }
-        }
-        Box(
-            Modifier.size(64.dp)
-                .pressable(haptic = true, scaleTo = 0.9f) { state.push(Route.QuickAdd) }
-                .shadow(16.dp, CircleShape, ambientColor = pal.accentShadow.copy(alpha = 0.3f), spotColor = pal.accentShadow.copy(alpha = 0.45f))
-                .clip(CircleShape).background(pal.accent),
-            contentAlignment = Alignment.Center,
-        ) { Lc(R.drawable.lc_plus, pal.onAccent, 26.dp, description = "Add sale or payment") }
     }
 }
 
@@ -291,7 +251,7 @@ private fun MonthItem(title: String, sub: String, selected: Boolean, onClick: ()
 
 /** Bottom space so lists clear the floating tab bar. */
 @Composable
-fun TabBarSpacer() = Spacer(Modifier.height(110.dp).navigationBarsPadding())
+fun TabBarSpacer() = Spacer(Modifier.height(96.dp).navigationBarsPadding())
 
 /** Small sync status line (Settings). */
 @Composable

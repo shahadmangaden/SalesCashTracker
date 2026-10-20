@@ -105,86 +105,86 @@ private fun DayHeader(day: String, total: String) {
 
 // ---------- Sales ----------
 
+/** Short day title for list sections: "Today", "Yesterday", "Monday 13 Oct". */
+fun daySection(iso: String): String = runCatching {
+    val d = LocalDate.parse(iso.take(10)); val today = LocalDate.now()
+    when {
+        d == today -> "Today"
+        d == today.minusDays(1) -> "Yesterday"
+        d.year == today.year -> d.format(DateTimeFormatter.ofPattern("EEEE d MMM", Locale.ENGLISH))
+        else -> d.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH))
+    }
+}.getOrDefault(iso)
+
 @Composable
 fun SalesScreen(state: AppState) {
     val bookings by Repository.bookings.collectAsStateWithLifecycle()
     val cash by Repository.cash.collectAsStateWithLifecycle()
+    val settings by Repository.settings.collectAsStateWithLifecycle()
     val due = remember(bookings, cash) { dueAfterCash(bookings, cash) }
     val code = LocalCurrency.current
     var search by remember { mutableStateOf("") }
-    var status by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf("") }   // "", "PAID", "DUE"
+    var monthMenu by remember { mutableStateOf(false) }
     val q = search.trim().lowercase()
-    val rows = bookings
-        .filter { state.inPeriod(it.date) }
-        .filter { state.agentFilter.isBlank() || it.agent == state.agentFilter }
+    val period = bookings.filter { state.inPeriod(it.date) }.filter { state.agentFilter.isBlank() || it.agent == state.agentFilter }
+    fun dueOf(b: Booking) = due[b.id] ?: (b.balance ?: 0.0)
+    val rows = period
         .filter { q.isBlank() || listOf(it.customer, it.agent, it.pnr, it.ref, it.detail, it.contact, it.sector, it.category).any { f -> f.lowercase().contains(q) } }
-        .filter { b ->
-            val d = due[b.id] ?: (b.balance ?: 0.0)
-            when (status) { "" -> true; "DUE" -> d > 0.5; else -> b.statusWith(d) == status }
-        }
+        .filter { b -> when (status) { "PAID" -> dueOf(b) <= 0.5; "DUE" -> dueOf(b) > 0.5; else -> true } }
         .sortedWith(compareByDescending<Booking> { it.date }.thenByDescending { it.createdAt })
-    val t = Totals.of(rows, emptyList())
-    val groups = rows.groupBy { it.date }
+    val all = Totals.of(period, emptyList())
+    val paidN = period.count { dueOf(it) <= 0.5 }
+    val dueTotal = period.sumOf { dueOf(it) }
 
-    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item {
-            AccentHeader("Sales", state.periodLong, actions = { HeaderMonthButton(state) }) {
-                HeaderCard {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            T("Total sales · $code", 13.sp, Glass.Muted, FontWeight.SemiBold)
-                            T(amt(t.sales), 30.sp, Glass.Ink, FontWeight.Bold)
-                        }
-                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            T("Profit", 11.sp, Glass.Muted, FontWeight.SemiBold)
-                            T(amt(t.profit), 16.sp, Glass.Ink, FontWeight.Bold)
+    IosPage(Scene.Sales) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            item {
+                LargeTitle("Sales", state.periodLong) {
+                    Box { GlassCircle(R.drawable.lc_calendar, "Choose a month") { monthMenu = true }; MonthMenu(state, monthMenu) { monthMenu = false } }
+                    AvatarButton(settings.user) { state.push(Route.Settings) }
+                }
+            }
+            item { Box(Modifier.padding(horizontal = 16.dp)) { IosSearch(search, { search = it }, "Search customer, agent or PNR") } }
+            item {
+                Box(Modifier.padding(horizontal = 16.dp)) {
+                    IosSegmented(listOf("" to "All  ${period.size}", "PAID" to "Paid  $paidN", "DUE" to "Due  ${period.size - paidN}"), status, { status = it })
+                }
+            }
+            if (state.agentFilter.isNotBlank()) item {
+                Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Choice("✕  ${nice(state.agentFilter)}", true, { state.agentFilter = "" })
+                }
+            }
+            item {
+                Row(Modifier.padding(horizontal = 16.dp).enter(0), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatTile("Total", cur(all.sales, code), Glass.Yellow, Modifier.weight(1f))
+                    StatTile("Profit", cur(all.profit, code), RingGreen, Modifier.weight(1f), Glass.Green)
+                    StatTile("Due", cur(dueTotal, code), RingOrange, Modifier.weight(1f), if (dueTotal > 0.5) Glass.Due else Glass.Ink) { status = "DUE" }
+                }
+            }
+            if (rows.isEmpty()) item {
+                Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().iosCard().padding(20.dp), contentAlignment = Alignment.Center) {
+                    IT(if (bookings.isEmpty()) "Tap + to add your first sale." else "No sales match. Try another month, search or filter.", 15.sp, Glass.Muted, maxLines = 2)
+                }
+            }
+            rows.groupBy { it.date.take(10) }.entries.forEachIndexed { gi, (day, list) ->
+                item(key = "s$day") {
+                    Column(Modifier.padding(horizontal = 16.dp).enter(gi + 1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IosSection(daySection(day), cur(list.sumOf { it.sellingPrice ?: 0.0 }, code))
+                        InsetGroup {
+                            list.forEachIndexed { i, b ->
+                                val d = dueOf(b)
+                                IosRow(productIcon(b.category), nice(b.customer),
+                                    listOf(sentence(b.category), nice(b.agent)).filter { it.isNotBlank() }.joinToString(" · "),
+                                    cur(b.sellingPrice, code), Glass.Ink, if (d > 0.5) "Due ${amt(d)}" else "Paid", if (d > 0.5) Glass.Due else Glass.Green,
+                                    last = i == list.lastIndex) { state.push(Route.EditSale(b)) }
+                            }
                         }
                     }
-                    T("${t.count} ${if (t.count == 1) "sale" else "sales"} · ${num(t.pax).ifBlank { "0" }} passengers", 12.sp, Glass.Muted)
                 }
             }
-        }
-        item { Box(Modifier.padding(top = 10.dp)) { GlassSearch(search, { search = it }, "Search customer, agent or product") } }
-        item {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (state.agentFilter.isNotBlank()) Choice("✕  ${nice(state.agentFilter)}", true, { state.agentFilter = "" }, large = true)
-                listOf("" to "All", "DUE" to "Balance due", "PAID" to "Paid", "PARTIAL" to "Partial", "PENDING" to "Pending").forEach { (k, l) ->
-                    Choice(l, status == k, { status = k }, large = true)
-                }
-            }
-        }
-        if (rows.isEmpty()) item {
-            GlassCard(spacing = 4.dp) {
-                T("No sales here", 15.sp, Glass.Ink, FontWeight.Bold)
-                T(if (bookings.isEmpty()) "Tap + to add your first sale." else "Try another month, search or filter.", 12.sp, Glass.Muted, maxLines = 2)
-            }
-        }
-        groups.forEach { (day, list) ->
-            item(key = "h$day") { DayHeader(day, cur(list.sumOf { it.sellingPrice ?: 0.0 }, code)) }
-            items(list, key = { it.id }) { b -> SaleCard(b, due[b.id] ?: (b.balance ?: 0.0), code) { state.push(Route.EditSale(b)) } }
-        }
-        item { TabBarSpacer() }
-    }
-}
-
-@Composable
-private fun SaleCard(b: Booking, due: Double, code: String, onClick: () -> Unit) {
-    GlassCard(padding = PaddingValues(14.dp), spacing = 10.dp, onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            IconTile(productIcon(b.category))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                T(nice(b.customer).ifBlank { "—" }, 14.sp, Glass.Ink, FontWeight.Bold)
-                T(listOf(sentence(b.category), b.detail.let { if (it.isBlank()) b.sector else it }.let { nice(it) })
-                    .filter { it.isNotBlank() }.joinToString(" · "), 11.sp, Glass.Muted)
-            }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                T(cur(b.sellingPrice, code), 14.sp, Glass.Ink, FontWeight.Bold)
-                b.profit?.let { p -> T("Profit ${amt(p)}", 10.sp, if (p >= 0) Glass.Green else Glass.Red) }
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            T(nice(b.agent).ifBlank { "No agent" }, 11.sp, Glass.Muted, modifier = Modifier.weight(1f))
-            PaymentPill(b.statusWith(due), due)
+            item { TabBarSpacer() }
         }
     }
 }
@@ -194,8 +194,10 @@ private fun SaleCard(b: Booking, due: Double, code: String, onClick: () -> Unit)
 @Composable
 fun CashScreen(state: AppState) {
     val cash by Repository.cash.collectAsStateWithLifecycle()
+    val settings by Repository.settings.collectAsStateWithLifecycle()
     val code = LocalCurrency.current
     var search by remember { mutableStateOf("") }
+    var monthMenu by remember { mutableStateOf(false) }
     val q = search.trim().lowercase()
     val period = cash.filter { state.inPeriod(it.date) }
     val rows = period
@@ -203,48 +205,48 @@ fun CashScreen(state: AppState) {
         .sortedWith(compareByDescending<CashEntry> { it.date }.thenByDescending { it.createdAt })
     val total = period.sumOf { it.amount }
     val agents = period.map { it.agent }.filter { it.isNotBlank() }.distinct().size
-    val monthWord = if (state.month == "all") "all time" else runCatching {
-        YearMonth.parse(state.month).format(DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH))
-    }.getOrDefault(state.month)
 
-    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item {
-            AccentHeader("Cash", state.periodLong, actions = { HeaderMonthButton(state) }) {
-                HeaderCard {
-                    T("Cash paid · ${monthWord.replaceFirstChar { it.uppercase() }} · $code", 13.sp, Glass.Muted, FontWeight.SemiBold)
-                    T(amt(total), 30.sp, Glass.Ink, FontWeight.Bold)
-                    T("${period.size} ${if (period.size == 1) "payment" else "payments"} across $agents ${if (agents == 1) "agent" else "agents"}", 12.sp, Glass.Muted)
+    IosPage(Scene.Cash) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            item {
+                LargeTitle("Cash", state.periodLong) {
+                    Box { GlassCircle(R.drawable.lc_calendar, "Choose a month") { monthMenu = true }; MonthMenu(state, monthMenu) { monthMenu = false } }
+                    AvatarButton(settings.user) { state.push(Route.Settings) }
                 }
             }
-        }
-        item { Box(Modifier.padding(top = 10.dp)) { GlassSearch(search, { search = it }, "Search agent, mode or remarks") } }
-        item {
-            Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Caps("RECENT PAYMENTS", 13.sp, Glass.OnBg, modifier = Modifier.weight(1f))
-                T("+ Add payment", 13.sp, Glass.OnBg, FontWeight.SemiBold, Modifier.clip(RoundedCornerShape(8.dp)).clickable { state.push(Route.EditCash(null)) }.padding(4.dp))
+            item {
+                Column(
+                    Modifier.padding(horizontal = 16.dp).fillMaxWidth().enter(0).iosCard(28.dp, Glass.Yellow).padding(horizontal = 20.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    IT(if (state.month == "all") "Cash received · all time" else "Cash received this month", 15.sp, Glass.OnAccentSub, FontWeight.SemiBold)
+                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        IT(code, 17.sp, Glass.OnAccentSub, FontWeight.SemiBold, Modifier.padding(bottom = 6.dp)); IT(amt(total), 42.sp, Glass.OnAccent, FontWeight.Bold)
+                    }
+                    IT("${period.size} ${if (period.size == 1) "payment" else "payments"} · $agents ${if (agents == 1) "agent" else "agents"}", 13.sp, Glass.OnAccentSub, FontWeight.Medium)
+                }
             }
-        }
-        if (rows.isEmpty()) item {
-            GlassCard(spacing = 4.dp) {
-                T("No payments yet", 15.sp, Glass.Ink, FontWeight.Bold)
-                T("Tap + then “Cash paid” to record money received from an agent.", 12.sp, Glass.Muted, maxLines = 2)
+            item { Box(Modifier.padding(horizontal = 16.dp)) { IosSearch(search, { search = it }, "Search agent or remarks") } }
+            if (rows.isEmpty()) item {
+                Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().iosCard().padding(20.dp), contentAlignment = Alignment.Center) {
+                    IT("No payments yet. Tap + then “Cash paid”.", 15.sp, Glass.Muted, maxLines = 2)
+                }
             }
-        }
-        rows.groupBy { it.date }.forEach { (day, list) ->
-            item(key = "h$day") { DayHeader(day, cur(list.sumOf { it.amount }, code)) }
-            items(list, key = { it.id }) { c ->
-                GlassCard(padding = PaddingValues(14.dp), onClick = { state.push(Route.EditCash(c)) }) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        IconTile(R.drawable.lc_wallet, Glass.GreenBg, Glass.Green)
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            T(nice(c.agent).ifBlank { "No agent" }, 14.sp, Glass.Ink, FontWeight.Bold)
-                            T(listOf(sentence(c.mode), c.remarks).filter { it.isNotBlank() }.joinToString(" · "), 11.sp, Glass.Muted)
+            rows.groupBy { it.date.take(10) }.entries.forEachIndexed { gi, (day, list) ->
+                item(key = "c$day") {
+                    Column(Modifier.padding(horizontal = 16.dp).enter(gi + 1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IosSection(daySection(day), cur(list.sumOf { it.amount }, code))
+                        InsetGroup {
+                            list.forEachIndexed { i, c ->
+                                IosRow(R.drawable.lc_wallet, nice(c.agent).ifBlank { "No agent" },
+                                    listOf(sentence(c.mode), c.remarks).filter { it.isNotBlank() }.joinToString(" · "),
+                                    "+" + amt(c.amount), Glass.Green, last = i == list.lastIndex) { state.push(Route.EditCash(c)) }
+                            }
                         }
-                        T(cur(c.amount, code), 14.sp, Glass.Green, FontWeight.Bold)
                     }
                 }
             }
+            item { TabBarSpacer() }
         }
-        item { TabBarSpacer() }
     }
 }

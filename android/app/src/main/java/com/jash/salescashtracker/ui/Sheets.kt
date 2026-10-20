@@ -189,11 +189,9 @@ private fun sendReceipt(ctx: android.content.Context, b: Booking, code: String, 
 @Composable
 fun QuickAddSheet(state: AppState) {
     SheetFrame("Add", onClose = { state.pop() }, spacing = 12.dp) {
-        QuickOption(R.drawable.lc_tickets_plane, Glass.TileBg, Glass.Blue, "New sale", "Ticket, visa, package, hotel, insurance…") {
-            state.replaceTop(Route.EditSale(null))
-        }
-        QuickOption(R.drawable.lc_wallet, Glass.GreenBg, Glass.Green, "Cash paid", "Money received from an agent or customer") {
-            state.replaceTop(Route.EditCash(null))
+        InsetGroup {
+            IosRow(R.drawable.lc_tickets_plane, "New sale", "Ticket, visa, Umrah, package, insurance…") { state.replaceTop(Route.EditSale(null)) }
+            IosRow(R.drawable.lc_wallet, "Cash paid", "Money received from an agent or customer", last = true, iconBg = RingGreen) { state.replaceTop(Route.EditCash(null)) }
         }
     }
 }
@@ -236,7 +234,8 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
         (b0.amountPaid ?: 0.0) > 0 -> "PARTIAL"
         else -> if (existing) "PENDING" else "PAID"
     }
-    var pay by remember { mutableStateOf(initialPay) }
+    // Two choices: paid in full, or a balance is due (with an optional amount paid now)
+    var payUi by remember { mutableStateOf(if (initialPay == "PAID") "PAID" else "DUE") }
     var partial by remember { mutableStateOf(if (initialPay == "PARTIAL") num(b0.amountPaid) else "") }
     var mode by remember { mutableStateOf(b0.paymentMode.ifBlank { "CASH" }) }
 
@@ -251,7 +250,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
     var bookingStatus by remember { mutableStateOf(b0.bookingStatus) }
     var docType by remember { mutableStateOf(b0.docType) }
     var entryDate by remember { mutableStateOf(b0.entryDate) }
-    val hasDetails = listOf(b0.detail, b0.customerType, b0.sector, b0.contact, b0.ref, b0.pnr, b0.serviceDate, b0.bookingStatus, b0.docType, b0.entryDate).any { it.isNotBlank() }
+    val hasDetails = listOf(b0.contact, b0.ref, b0.pnr, b0.serviceDate, b0.docType, b0.entryDate).any { it.isNotBlank() }
     var showMore by remember { mutableStateOf(hasDetails) }
     var addAgent by remember { mutableStateOf(false) }
     var allProducts by remember { mutableStateOf(false) }
@@ -261,6 +260,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
     var confirmDelete by remember { mutableStateOf(false) }
 
     val sell = parseNum(selling)
+    val pay = if (payUi == "PAID") "PAID" else if ((parseNum(partial) ?: 0.0) > 0.0) "PARTIAL" else "PENDING"
     val paidAmount: Double? = when (pay) { "PAID" -> sell; "PARTIAL" -> parseNum(partial); else -> 0.0 }
 
     fun build(): Booking = b0.copy(
@@ -286,13 +286,9 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
         else state.pop()
     }
 
-    SheetFrame(if (existing) "Edit sale" else "New sale", onClose = { state.pop() }, spacing = 14.dp, footer = {
+    SheetFrame(if (existing) "Edit Sale" else "New Sale", onClose = { state.pop() }, spacing = 14.dp, onConfirm = { save(false) }, footer = {
         ErrorText(error)
-        SubmitButton(if (existing) "Save changes" else "Save sale", R.drawable.lc_check, { save(false) })
-        Row(Modifier.fillMaxWidth()) {
-            if (!existing) TextAction("Save & add another", Glass.Ink, Modifier.weight(1f)) { save(true) }
-            TextAction("Save & send WhatsApp", Glass.Green, Modifier.weight(1f)) { save(false, whatsapp = true) }
-        }
+        SubmitButton("Save & send WhatsApp receipt", null, { save(false, whatsapp = true) })
     }) {
         ErrorText(error)
         DateChoices("Sale date", date) { date = it }
@@ -313,18 +309,16 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
 
         // Products: 2-column bento grid
         val productOptions = if (allProducts) lists.categories else
-            ranked(all.map { it.category }, lists.categories, 5).let { if (category.isNotBlank() && category !in it) listOf(category) + it.take(4) else it }
+            ranked(all.map { it.category }, lists.categories, 3).let { if (category.isNotBlank() && category !in it) listOf(category) + it.take(2) else it }
         FieldLabel("Product")
         ProductGrid(productOptions, category, { if (category != it) { category = it; detail = ""; otherSub = false } }) { m ->
             val shape = RoundedCornerShape(20.dp)
             Column(
-                m.clip(shape).background(Glass.Card.copy(alpha = 0.6f)).border(1.dp, Glass.Edge, shape).clickable { allProducts = !allProducts }.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                m.iosCard(20.dp).clickable { allProducts = !allProducts }.padding(vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
             ) {
-                Box(Modifier.size(38.dp).clip(CircleShape).background(Glass.Charcoal), contentAlignment = Alignment.Center) {
-                    Lc(if (allProducts) R.drawable.lc_chevron_down else R.drawable.lc_layout_grid, Glass.Yellow, 18.dp, if (allProducts) Modifier.rotate(180f) else Modifier)
-                }
-                T(if (allProducts) "Fewer products" else "All products", 13.sp, Glass.Ink, FontWeight.SemiBold)
+                Lc(if (allProducts) R.drawable.lc_chevron_down else R.drawable.lc_plus, Glass.Ink, 22.dp, if (allProducts) Modifier.rotate(180f) else Modifier)
+                IT(if (allProducts) "Less" else "More", 13.sp, Glass.Ink, FontWeight.Medium)
             }
         }
 
@@ -361,21 +355,14 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
             }
         }
 
-        // Payment status: folder-tab control with coloured dots
+        // Payment: paid in full, or balance due
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            FieldLabel("Payment status")
-            StatusTabs(
-                listOf(
-                    Triple("PAID", "Paid in Full", Glass.Green),
-                    Triple("PARTIAL", "Partial Payment", Color(0xFFF59E0B)),
-                    Triple("PENDING", "Awaiting Payment", Glass.Red),
-                ),
-                pay,
-            ) { pay = it }
+            FieldLabel("Payment")
+            IosSegmented(listOf("PAID" to "Paid in full", "DUE" to "Balance due"), payUi, { payUi = it })
         }
-        AnimatedVisibility(pay == "PARTIAL") {
+        AnimatedVisibility(payUi == "DUE") {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
-                GlassInput("Amount paid now · $code", partial, { partial = it }, Modifier.weight(1f), placeholder = "0", keyboard = KeyboardType.Decimal)
+                GlassInput("Paid now · optional", partial, { partial = it }, Modifier.weight(1f), placeholder = "0", keyboard = KeyboardType.Decimal)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     FieldLabel("Pending balance")
                     Box(
@@ -409,7 +396,7 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     T("More details", 14.sp, Glass.Ink, FontWeight.Bold)
-                    T("Passport, travel date, visa, notes", 11.sp, Glass.Muted)
+                    T("Passport, PNR, travel date, visa", 11.sp, Glass.Muted)
                 }
                 Lc(R.drawable.lc_chevron_down, Glass.Muted, 18.dp, Modifier.rotate(if (showMore) 180f else 0f))
             }
@@ -419,21 +406,15 @@ fun SaleSheet(original: Booking?, isCopy: Boolean, state: AppState) {
         }
         AnimatedVisibility(showMore) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                DropdownField("Service detail / notes", detail, all.map { it.detail }.filter { it.isNotBlank() }.distinct().sorted(), { detail = it }, editable = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DropdownField("Customer type", customerType, lists.customerTypes, { customerType = it }, Modifier.weight(1f))
-                    FormField("Pax", pax, { pax = it }, Modifier.weight(0.5f), keyboard = KeyboardType.Number)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DropdownField("Sector", sector, lists.countries, { sector = it }, Modifier.weight(1f), editable = true)
                     FormField("PNR", pnr, { pnr = it }, Modifier.weight(1f))
+                    FormField("Pax", pax, { pax = it }, Modifier.weight(0.5f), keyboard = KeyboardType.Number)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     FormField("Passport / ref", ref, { ref = it }, Modifier.weight(1f))
                     FormField("Contact", contact, { contact = it }, Modifier.weight(1f), keyboard = KeyboardType.Phone)
                 }
                 DateField("Travel / service date", serviceDate, { serviceDate = it }, allowClear = true)
-                DropdownField("Booking status", bookingStatus, lists.bookingStatuses, { bookingStatus = it })
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     DropdownField("Visa type", docType, lists.docTypes.map { it.name }, { docType = it }, Modifier.weight(1f))
                     DateField("Entry date", entryDate, { entryDate = it }, Modifier.weight(1f), allowClear = true)
@@ -496,9 +477,8 @@ fun CashSheet(original: CashEntry?, state: AppState) {
         if (again) state.replaceTop(Route.EditCash(CashEntry(date = date, agent = agent.trim().uppercase(), mode = mode))) else state.pop()
     }
 
-    SheetFrame(if (existing) "Edit payment" else "Cash paid", onClose = { state.pop() }, spacing = 16.dp, footer = {
+    SheetFrame(if (existing) "Edit Payment" else "Cash Paid", onClose = { state.pop() }, spacing = 16.dp, onConfirm = { save(false) }, footer = {
         SubmitButton(if (existing) "Save changes" else "Save payment", R.drawable.lc_check, { save(false) })
-        if (!existing) TextAction("Save & add another") { save(true) }
     }) {
         Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
             T("AMOUNT · $code", 12.sp, Glass.Muted)

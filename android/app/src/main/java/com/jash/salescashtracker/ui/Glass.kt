@@ -51,6 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.geometry.Offset
@@ -81,7 +83,6 @@ import com.jash.salescashtracker.ui.theme.Inter
 import java.text.DecimalFormat
 import java.util.Locale
 
-// ---------- Design tokens (Cream & Ink / Navy & Lime / Black & Yellow mockups) ----------
 
 /** A colour theme. Values come straight from the theme mockups. */
 data class Palette(
@@ -103,64 +104,64 @@ data class Palette(
     val shadow: Color, val accentShadow: Color,
 )
 
-val Cream = Palette(
-    id = "cream", name = "Cream & Ink",
-    bg = listOf(Color(0xFFEFEBE4), Color(0xFFEFEBE4)), glow = 0f, darkBg = false, darkCard = false,
-    onBg = Color(0xFF1C1B19), onBgMuted = Color(0xFF6B655A),
-    ink = Color(0xFF1C1B19), muted = Color(0xFF6B655A),
-    primary = Color(0xFF1C1B19), onPrimary = Color(0xFFF2EEE6),
-    accent = Color(0xFFF5C842), accent2 = Color(0xFFEDB92E), onAccent = Color(0xFF1C1B19), onAccentSub = Color(0xFF4A3F12), accentSoft = Color(0xFFFCEFC2),
-    card = Color.White, sheet = Color(0xFFF7F4EE), field = Color(0xFFF1EEE8),
-    tile = Color(0xFFEFEBE4), divider = Color(0xFFE6E1D8), track = Color(0xFFE6E1D8), ringFill = Color(0xFF1C1B19), due = Color(0xFFC2410C),
-    panel = Color(0xFF1C1B19), panelEdge = Color(0xFF1C1B19), rowEdge = Color(0xFF34322E), rowIcon = Color(0xFF2B2925),
-    panelText = Color(0xFFF2EEE6), panelTitle = Color(0xFFF5C842), panelSub = Color(0xFFB8B2A7),
-    navBg = Color.White.copy(alpha = 0.86f), navEdge = Color.White.copy(alpha = 0.95f), navActiveBg = Color(0xFF1C1B19).copy(alpha = 0.08f),
-    navActive = Color(0xFF1C1B19), navIdle = Color(0xFF6B655A),
-    shadow = Color(0xFF3C321E), accentShadow = Color(0xFFA0780A),
+// ---------- Design tokens: Light / Legal Navy / Arctic Frost (iOS-style redesign) ----------
+
+val LightPalette = Palette(
+    id = "light", name = "Light",
+    bg = listOf(Color(0xFFF5F5F5), Color(0xFFF5F5F5)), glow = 0f, darkBg = false, darkCard = false,
+    onBg = Color(0xFF171717), onBgMuted = Color(0xFF737373),
+    ink = Color(0xFF171717), muted = Color(0xFF737373),
+    primary = Color(0xFF171717), onPrimary = Color(0xFFFFFFFF),
+    accent = Color(0xFF171717), accent2 = Color(0xFF2E2E2E), onAccent = Color(0xFFFFFFFF), onAccentSub = Color(0xFFA3A3A3), accentSoft = Color(0xFFEDEDED),
+    card = Color.White, sheet = Color(0xFFF5F5F5), field = Color(0xFFEFEFEF),
+    tile = Color(0xFFEFEFEF), divider = Color(0xFFE5E5E5), track = Color(0xFFE5E5E5), ringFill = Color(0xFF171717), due = Color(0xFFC2410C),
+    panel = Color(0xFF171717), panelEdge = Color(0xFF171717), rowEdge = Color(0xFF404040), rowIcon = Color(0xFF404040),
+    panelText = Color(0xFFFAFAFA), panelTitle = Color(0xFFFAFAFA), panelSub = Color(0xFFA3A3A3),
+    navBg = Color.White.copy(alpha = 0.82f), navEdge = Color.White.copy(alpha = 0.9f), navActiveBg = Color(0xFFEFEFEF),
+    navActive = Color(0xFF171717), navIdle = Color(0xFF171717),
+    shadow = Color(0xFF000000), accentShadow = Color(0xFF171717),
+)
+val LegalPalette = Palette(
+    id = "legal", name = "Legal Navy",
+    bg = listOf(Color(0xFFF8F9FA), Color(0xFFF8F9FA)), glow = 0f, darkBg = false, darkCard = false,
+    onBg = Color(0xFF1F2E4A), onBgMuted = Color(0xFF5C6670),
+    ink = Color(0xFF1F2E4A), muted = Color(0xFF5C6670),
+    primary = Color(0xFF1F2E4A), onPrimary = Color(0xFFF8F9FA),
+    accent = Color(0xFF1F2E4A), accent2 = Color(0xFF2D3F60), onAccent = Color(0xFFF8F9FA), onAccentSub = Color(0xFFCED4DA), accentSoft = Color(0xFFE3E8F0),
+    card = Color.White, sheet = Color(0xFFF8F9FA), field = Color(0xFFE9ECEF),
+    tile = Color(0xFFE9ECEF), divider = Color(0xFFDEE2E6), track = Color(0xFFDEE2E6), ringFill = Color(0xFF1F2E4A), due = Color(0xFFC2410C),
+    panel = Color(0xFF343A40), panelEdge = Color(0xFF343A40), rowEdge = Color(0xFF4A5058), rowIcon = Color(0xFF4A5058),
+    panelText = Color(0xFFF8F9FA), panelTitle = Color(0xFFF8F9FA), panelSub = Color(0xFFCED4DA),
+    navBg = Color.White.copy(alpha = 0.82f), navEdge = Color.White.copy(alpha = 0.9f), navActiveBg = Color(0xFFE9ECEF),
+    navActive = Color(0xFF1F2E4A), navIdle = Color(0xFF1F2E4A),
+    shadow = Color(0xFF1F2E4A), accentShadow = Color(0xFF1F2E4A),
+)
+val ArcticPalette = Palette(
+    id = "arctic", name = "Arctic Frost",
+    bg = listOf(Color(0xFFEAF1F4), Color(0xFFEAF1F4)), glow = 0f, darkBg = false, darkCard = false,
+    onBg = Color(0xFF0A2E36), onBgMuted = Color(0xFF557580),
+    ink = Color(0xFF0A2E36), muted = Color(0xFF557580),
+    primary = Color(0xFF0A2E36), onPrimary = Color(0xFFFFFFFF),
+    accent = Color(0xFF2A5A6D), accent2 = Color(0xFF3B6E82), onAccent = Color(0xFFFFFFFF), onAccentSub = Color(0xFFD2E0E6), accentSoft = Color(0xFFDCE9EE),
+    card = Color.White, sheet = Color(0xFFEAF1F4), field = Color(0xFFE1EBEF),
+    tile = Color(0xFFE1EBEF), divider = Color(0xFFD2E0E6), track = Color(0xFFD2E0E6), ringFill = Color(0xFF2A5A6D), due = Color(0xFFC2410C),
+    panel = Color(0xFF0A2E36), panelEdge = Color(0xFF0A2E36), rowEdge = Color(0xFF1F4A55), rowIcon = Color(0xFF1F4A55),
+    panelText = Color(0xFFEAF1F4), panelTitle = Color(0xFFEAF1F4), panelSub = Color(0xFF8FB7C2),
+    navBg = Color.White.copy(alpha = 0.82f), navEdge = Color.White.copy(alpha = 0.9f), navActiveBg = Color(0xFFE1EBEF),
+    navActive = Color(0xFF2A5A6D), navIdle = Color(0xFF0A2E36),
+    shadow = Color(0xFF0A2E36), accentShadow = Color(0xFF2A5A6D),
 )
 
-val Navy = Palette(
-    id = "navy", name = "Navy & Lime",
-    bg = listOf(Color(0xFF0A1120), Color(0xFF0A1120)), glow = 0.18f, darkBg = true, darkCard = true,
-    onBg = Color(0xFFF3F6FB), onBgMuted = Color(0xFFA9B6CC),
-    ink = Color(0xFFF3F6FB), muted = Color(0xFFA9B6CC),
-    primary = Color(0xFFC6F16D), onPrimary = Color(0xFF0A1120),
-    accent = Color(0xFFC6F16D), accent2 = Color(0xFFB2E052), onAccent = Color(0xFF0A1120), onAccentSub = Color(0xFF3B4A1A), accentSoft = Color(0xFF2C3D35),
-    card = Color(0xFF16213A), sheet = Color(0xFF111A2E), field = Color(0xFF0D1526),
-    tile = Color(0xFF1C2840), divider = Color(0xFF22304C), track = Color(0x24FFFFFF), ringFill = Color(0xFFC6F16D), due = Color(0xFFFFB86B),
-    panel = Color(0xFF111A2E), panelEdge = Color(0xFF22304C), rowEdge = Color(0xFF22304C), rowIcon = Color(0xFF1C2840),
-    panelText = Color(0xFFF3F6FB), panelTitle = Color(0xFFC6F16D), panelSub = Color(0xFFA9B6CC),
-    navBg = Color(0xEB141E34), navEdge = Color.White.copy(alpha = 0.12f), navActiveBg = Color.White.copy(alpha = 0.12f),
-    navActive = Color(0xFFC6F16D), navIdle = Color(0xFFA9B6CC),
-    shadow = Color.Black, accentShadow = Color(0xFFC6F16D),
-)
-
-val Black = Palette(
-    id = "black", name = "Black & Yellow",
-    bg = listOf(Color(0xFF0D0D0D), Color(0xFF0D0D0D)), glow = 0.14f, darkBg = true, darkCard = true,
-    onBg = Color(0xFFF5F3EE), onBgMuted = Color(0xFFA8A29E),
-    ink = Color(0xFFF5F3EE), muted = Color(0xFFA8A29E),
-    primary = Color(0xFFF5C842), onPrimary = Color(0xFF111111),
-    accent = Color(0xFFF5C842), accent2 = Color(0xFFE8B92E), onAccent = Color(0xFF111111), onAccentSub = Color(0xFF4A3F12), accentSoft = Color(0xFF3F3822),
-    card = Color(0xFF1C1C1C), sheet = Color(0xFF161616), field = Color(0xFF111111),
-    tile = Color(0xFF262626), divider = Color(0xFF2C2C2C), track = Color(0xFF333333), ringFill = Color(0xFFF5C842), due = Color(0xFFFB923C),
-    panel = Color(0xFF161616), panelEdge = Color(0xFF262626), rowEdge = Color(0xFF2C2C2C), rowIcon = Color(0xFF262626),
-    panelText = Color(0xFFF5F3EE), panelTitle = Color(0xFFF5C842), panelSub = Color(0xFFA8A29E),
-    navBg = Color(0xEB1C1C1C), navEdge = Color.White.copy(alpha = 0.10f), navActiveBg = Color(0xFFF5C842).copy(alpha = 0.16f),
-    navActive = Color(0xFFF5C842), navIdle = Color(0xFFA8A29E),
-    shadow = Color.Black, accentShadow = Color(0xFFF5C842),
-)
-
-val Palettes = listOf(Cream, Navy, Black)
+val Palettes = listOf(LightPalette, LegalPalette, ArcticPalette)
 
 /** The active theme; reading it inside composables recomposes them when the theme changes. */
 object ThemeState {
-    var palette by androidx.compose.runtime.mutableStateOf(Cream)
+    var palette by androidx.compose.runtime.mutableStateOf(LightPalette)
     /** True when the phone's "Remove animations" setting is on (Reduce Motion). */
     var reduceMotion by androidx.compose.runtime.mutableStateOf(false)
     fun load(ctx: android.content.Context) {
         val id = ctx.getSharedPreferences("ui", android.content.Context.MODE_PRIVATE).getString("theme", null)
-        palette = Palettes.firstOrNull { it.id == id } ?: Cream   // older "mustard" / "crimson" -> Cream & Ink
+        palette = Palettes.firstOrNull { it.id == id } ?: LightPalette   // older themes fall back to Light
         reduceMotion = runCatching {
             android.provider.Settings.Global.getFloat(ctx.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
         }.getOrDefault(false)
@@ -299,15 +300,12 @@ fun GlassBackground(forceLight: Boolean = false, content: @Composable BoxScope.(
 
 /** Frosted glass: white gradient fill, bright fading edge, soft floating shadow. */
 fun Modifier.glass(radius: Dp = 24.dp, alpha: Float = 0.66f, shadow: Boolean = true): Modifier {
+    // iOS-style card: solid white surface with a very soft shadow
     val shape = RoundedCornerShape(radius)
-    val top = (alpha + 0.30f).coerceAtMost(0.98f)
-    val bottom = (alpha + 0.18f).coerceAtMost(0.92f)
     return this
-        // Soft raised depth (white highlight + navy shade) from the reference designs
-        .softShadow(radius, if (shadow) 5.dp else 3.dp, if (shadow) 14.dp else 8.dp, if (shadow) 0.10f else 0.06f, if (shadow) 0.65f else 0.45f)
+        .shadow(if (shadow) 10.dp else 4.dp, shape, ambientColor = Glass.Shadow.copy(alpha = 0.05f), spotColor = Glass.Shadow.copy(alpha = 0.08f))
         .clip(shape)
-        .background(Brush.verticalGradient(listOf(Glass.Card.copy(alpha = top), Glass.Card.copy(alpha = bottom))))
-        .border(1.dp, Brush.verticalGradient(listOf(Glass.Edge, Glass.Edge.copy(alpha = 0.1f))), shape)
+        .background(Glass.Card)
 }
 
 @Composable
@@ -390,13 +388,8 @@ fun PageHeading(title: String, subtitle: String, @DrawableRes action: Int? = nul
 }
 
 @Composable
-fun SectionHeading(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Caps(title.uppercase(java.util.Locale.ENGLISH), 13.sp, Glass.OnBg, modifier = Modifier.weight(1f))
-        if (action != null) T(action, 12.sp, Glass.OnBg, FontWeight.SemiBold,
-            if (onAction != null) Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onAction).padding(2.dp) else Modifier)
-    }
-}
+fun SectionHeading(title: String, action: String? = null, onAction: (() -> Unit)? = null) =
+    IosSection(title, action, onAction != null, onAction)
 
 /** Selectable pill ("Choice" in the design). */
 @Composable
@@ -596,11 +589,12 @@ fun SheetFrame(
     title: String,
     onClose: () -> Unit,
     spacing: Dp = 10.dp,
+    onConfirm: (() -> Unit)? = null,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val maxH = (LocalConfiguration.current.screenHeightDp * 0.9f).dp
-    val shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+    val maxH = (LocalConfiguration.current.screenHeightDp * 0.93f).dp
+    val shape = RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp)
     Column(
         Modifier
             .fillMaxWidth()
@@ -608,7 +602,6 @@ fun SheetFrame(
             .shadow(14.dp, shape, ambientColor = Glass.Shadow.copy(alpha = 0.14f), spotColor = Glass.Shadow.copy(alpha = 0.2f))
             .clip(shape)
             .background(Glass.Sheet)
-            .border(1.dp, Glass.Edge, shape)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
             .imePadding()
             .padding(top = 10.dp),
@@ -617,17 +610,23 @@ fun SheetFrame(
             Box(Modifier.width(36.dp).height(4.dp).clip(RoundedCornerShape(4.dp)).background(Glass.Muted.copy(alpha = 0.45f)))
         }
         Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp), verticalAlignment = Alignment.CenterVertically) {
-            T(title, 26.sp, Glass.Ink, FontWeight.Bold, Modifier.weight(1f))
-            Box(Modifier.size(30.dp).clip(CircleShape).background(Glass.CloseBg).clickable(onClick = onClose), contentAlignment = Alignment.Center) {
-                Lc(R.drawable.lc_x, Glass.Ink, 16.dp, description = "Close")
+        // iOS sheet toolbar: close (glass) · centred title · confirm (tinted)
+        Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                GlassCircle(R.drawable.lc_x, "Close", onClose)
+                Spacer(Modifier.weight(1f))
+                if (onConfirm != null) Box(
+                    Modifier.size(44.dp).pressable(haptic = true, onClick = onConfirm).clip(CircleShape).background(Glass.Yellow),
+                    contentAlignment = Alignment.Center,
+                ) { Lc(R.drawable.lc_check, Glass.OnAccent, 20.dp, description = "Save") }
             }
+            IT(title, 17.sp, Glass.Ink, FontWeight.SemiBold)
         }
         Spacer(Modifier.height(spacing))
         Column(
             Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
                 .then(if (footer == null) Modifier.navigationBarsPadding() else Modifier)
-                .padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = if (footer == null) 22.dp else 16.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = if (footer == null) 22.dp else 16.dp),
             verticalArrangement = Arrangement.spacedBy(spacing),
             content = content,
         )
@@ -635,7 +634,7 @@ fun SheetFrame(
             // Pinned action bar: the Save button is always visible, the form scrolls behind it
             Box(Modifier.fillMaxWidth().height(1.dp).background(Glass.Divider))
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 10.dp),
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 content = footer,
             )
@@ -716,36 +715,27 @@ fun DateStrip(selected: String, onSelect: (String) -> Unit, onPickOlder: () -> U
 /** Products as a 2-column bento grid: round icon badge top-left, label below, check badge when selected. */
 @Composable
 fun ProductGrid(options: List<String>, selected: String, onSelect: (String) -> Unit, extra: (@Composable (Modifier) -> Unit)? = null) {
+    // iOS-style product tiles, four per row: icon over label; the chosen one is filled with the theme tint
     val cells: List<String?> = options + (if (extra != null) listOf(null) else emptyList())
-    Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        cells.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        cells.chunked(4).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { o ->
-                    val m = Modifier.weight(1f).heightIn(min = 92.dp)
+                    val m = Modifier.weight(1f).heightIn(min = 76.dp)
                     if (o == null) extra?.invoke(m) else {
                         val on = o == selected
                         val shape = RoundedCornerShape(20.dp)
-                        Box(
-                            m.then(if (on) Modifier else Modifier.softShadow(20.dp, 5.dp, 14.dp, 0.10f, 0.9f)).clip(shape)
-                                .then(if (on) Modifier.recessed(shape, Glass.YellowSoft) else Modifier.background(Glass.Card))
-                                .border(if (on) 2.dp else 1.dp, if (on) Glass.Charcoal else Glass.Edge, shape)
-                                .clickable { onSelect(o) },
+                        Column(
+                            m.pressable(scaleTo = 0.95f) { onSelect(o) }.iosCard(20.dp, if (on) Glass.Yellow else Glass.Card)
+                                .semantics { this.selected = on }.padding(horizontal = 4.dp, vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
                         ) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Box(
-                                    Modifier.size(38.dp).clip(CircleShape).background(if (on) Glass.Yellow else Glass.TileBg),
-                                    contentAlignment = Alignment.Center,
-                                ) { Lc(productIcon(o), if (on) Glass.OnAccent else Glass.Ink, 19.dp) }
-                                T(sentence(o), 13.sp, Glass.Ink, FontWeight.SemiBold, maxLines = 2)
-                            }
-                            if (on) Box(
-                                Modifier.align(Alignment.TopEnd).padding(10.dp).size(22.dp).clip(CircleShape).background(Glass.Charcoal),
-                                contentAlignment = Alignment.Center,
-                            ) { Lc(R.drawable.lc_check, Glass.OnPrimary, 13.dp) }
+                            Lc(productIcon(o), if (on) Glass.OnAccent else Glass.Ink, 22.dp)
+                            T(sentence(o), 12.sp, if (on) Glass.OnAccent else Glass.Ink, if (on) FontWeight.SemiBold else FontWeight.Medium, maxLines = 2, align = TextAlign.Center)
                         }
                     }
                 }
-                repeat(2 - row.size) { Box(Modifier.weight(1f)) }
+                repeat(4 - row.size) { Box(Modifier.weight(1f)) }
             }
         }
     }

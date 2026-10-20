@@ -7,6 +7,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -68,102 +72,95 @@ fun ReportsScreen(state: AppState) {
     val bookings by Repository.bookings.collectAsStateWithLifecycle()
     val cash by Repository.cash.collectAsStateWithLifecycle()
     val lists by Repository.lists.collectAsStateWithLifecycle()
+    val settings by Repository.settings.collectAsStateWithLifecycle()
     val code = LocalCurrency.current
     val pb = bookings.filter { state.inPeriod(it.date) }
     val pc = cash.filter { state.inPeriod(it.date) }
+    var monthMenu by remember { mutableStateOf(false) }
 
     val range = if (state.month == "all") "All time" else runCatching {
         val ym = YearMonth.parse(state.month)
         val last = if (ym == YearMonth.now()) LocalDate.now().dayOfMonth else ym.lengthOfMonth()
-        "1 – $last ${ym.format(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH))}"
+        "1 – $last ${ym.format(DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH))}"
     }.getOrDefault("")
-    val periodWord = if (state.month == "all") "all-time" else "this month’s"
 
-    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        item {
-            AccentHeader("Reports", listOf(state.periodLong, range).filter { it.isNotBlank() && it != "All time" }.distinct().joinToString(" · ").ifBlank { "All time" },
-                actions = {
-                    HeaderMonthButton(state)
-                    HeaderButton(R.drawable.lc_download, "Export to Excel", dark = true) { exportCsv(ctx, bookings, cash, lists) }
-                })
+    IosPage(Scene.Reports) {
+        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            item {
+                LargeTitle("Reports", range, modifier = Modifier.bleed(16.dp)) {
+                    Box { GlassCircle(R.drawable.lc_calendar, "Choose a month") { monthMenu = true }; MonthMenu(state, monthMenu) { monthMenu = false } }
+                    GlassCircle(R.drawable.lc_download, "Export to Excel") { exportCsv(ctx, bookings, cash, lists) }
+                    AvatarButton(settings.user) { state.push(Route.Settings) }
+                }
+            }
+            item { IosSegmented(listOf("agents" to "Agents", "products" to "Products", "visas" to "Visas"), state.reportsPage, { state.reportsPage = it }) }
+            when (state.reportsPage) {
+                "products" -> productsReport(pb, code, state)
+                "visas" -> visasReport(bookings, lists.docTypes, ctx, state)
+                else -> agentsReport(pb, pc, bookings, code, state)
+            }
+            item { TabBarSpacer() }
         }
-        item {
-            Segments(listOf("agents" to "Agents", "products" to "Products", "visas" to "Visa expiry"), state.reportsPage) { state.reportsPage = it }
-        }
-        when (state.reportsPage) {
-            "products" -> productsReport(pb, code, state)
-            "visas" -> visasReport(bookings, lists.docTypes, ctx, state)
-            else -> agentsReport(pb, pc, code, periodWord, state)
-        }
-        item { TabBarSpacer() }
     }
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.agentsReport(
-    pb: List<Booking>, pc: List<com.jash.salescashtracker.data.CashEntry>, code: String, periodWord: String, state: AppState,
+    pb: List<Booking>, pc: List<com.jash.salescashtracker.data.CashEntry>, allBookings: List<Booking>, code: String, state: AppState,
 ) {
     val key = { a: String -> a.ifBlank { "(no agent)" } }
     val names = (pb.map { key(it.agent) } + pc.map { key(it.agent) }).distinct()
     val rows = names.map { a -> a to Totals.of(pb.filter { key(it.agent) == a }, pc.filter { key(it.agent) == a }) }
         .sortedWith(compareByDescending<Pair<String, Totals>> { it.second.remaining }.thenByDescending { it.second.sales })
-    val all = Totals.of(pb, pc)
     val owing = rows.filter { it.second.remaining > 0.5 }
     val totalDue = owing.sumOf { it.second.remaining }
+    // Six months of sales ending at the selected month
+    val end = if (state.month == "all") YearMonth.now() else runCatching { YearMonth.parse(state.month) }.getOrDefault(YearMonth.now())
+    val months = (5 downTo 0).map { end.minusMonths(it.toLong()) }
+    val sales = months.map { ym -> ym.format(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)) to allBookings.filter { it.date.startsWith(ym.toString()) }.sumOf { it.sellingPrice ?: 0.0 } }
 
     item {
-        GlassCard(spacing = 6.dp) {
-            T("Total amount to collect", 13.sp, Glass.Muted)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                T(cur(totalDue, code), 32.sp, Glass.Ink, FontWeight.Bold, Modifier.weight(1f))
-                IconTile(R.drawable.lc_hand_coins, Glass.BlueBg, Glass.Blue, 40.dp, 15.dp, 20.dp)
+        Column(Modifier.fillMaxWidth().enter(0).iosCard().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Column(Modifier.weight(1f)) {
+                    IT("To collect from agents", 13.sp, Glass.Muted, FontWeight.SemiBold)
+                    IT(cur(totalDue, code), 28.sp, Glass.Ink, FontWeight.Bold)
+                }
+                IT("${owing.size} ${if (owing.size == 1) "agent" else "agents"}", 13.sp, Glass.Muted, FontWeight.SemiBold)
             }
-            val share = if (all.sales > 0) pctWhole(totalDue / all.sales) else "0%"
-            T("${owing.size} ${if (owing.size == 1) "agent" else "agents"} · $share of $periodWord sales", 11.sp, Glass.Muted)
+            MonthBars(sales)
         }
     }
     item {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionHeading("Agent balances", "Highest first ↓")
-            if (rows.isEmpty()) GlassCard { T("Nothing recorded in this period", 13.sp, Glass.Muted) }
-            rows.forEachIndexed { i, (name, t) ->
-                val collected = (t.sales - t.remaining).coerceAtLeast(0.0)
-                GlassCard(padding = PaddingValues(14.dp), spacing = 10.dp, onClick = {
-                    state.agentFilter = if (name == "(no agent)") "" else name; state.tab = Tab.Sales
-                }) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        InitialsAvatar(name, i)
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            T(nice(name), 14.sp, Glass.Ink, FontWeight.Bold)
-                            T("${t.count} ${if (t.count == 1) "sale" else "sales"} · ${cur(t.sales, code)}", 11.sp, Glass.Muted)
-                        }
-                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            T(cur(Math.abs(t.remaining), code), 15.sp, Glass.Ink, FontWeight.Bold)
-                            when {
-                                t.remaining > 0.5 -> T("To collect", 10.sp, Glass.Amber)
-                                t.remaining < -0.5 -> T("Paid ahead", 10.sp, Glass.Green)
-                                else -> T("Settled", 10.sp, Glass.Green)
-                            }
-                        }
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        ProgressLine(if (t.sales > 0) (collected / t.sales).toFloat() else 1f)
-                        T("${cur(collected, code)} collected", 10.sp, Glass.Muted)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            IosSection("Agent balances", "Highest first")
+            if (rows.isEmpty()) Box(Modifier.fillMaxWidth().iosCard().padding(20.dp), contentAlignment = Alignment.Center) { IT("Nothing recorded in this period", 15.sp, Glass.Muted) }
+            else InsetGroup(Modifier.enter(1)) {
+                rows.forEachIndexed { i, (name, t) ->
+                    val pct = if (t.sales > 0) ((t.sales - t.remaining) / t.sales).coerceIn(0.0, 1.0) else 1.0
+                    IosRow(R.drawable.lc_building_2, nice(name), "${Math.round(pct * 100)}% collected · ${t.count} ${if (t.count == 1) "sale" else "sales"}",
+                        if (t.remaining > 0.5) cur(t.remaining, code) else "Settled", if (t.remaining > 0.5) Glass.Due else Glass.Green,
+                        if (t.remaining > 0.5) "due" else "", Glass.Muted, last = i == rows.lastIndex) {
+                        state.agentFilter = if (name == "(no agent)") "" else name; state.tab = Tab.Sales
                     }
                 }
             }
         }
     }
-    owing.firstOrNull()?.let { (name, t) ->
-        item {
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Glass.Card.copy(alpha = 0.6f))
-                    .border(1.dp, Glass.Edge, RoundedCornerShape(18.dp)).padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Lc(R.drawable.lc_lightbulb, Glass.Amber, 20.dp)
-                T("Start with ${nice(name)} — ${pctWhole(t.remaining / totalDue)} of your outstanding balance is with this agent.",
-                    11.sp, Glass.Muted, modifier = Modifier.weight(1f), maxLines = 3)
+}
+
+/** Six-month bar chart; the selected month is tinted and bars grow in. */
+@Composable
+private fun MonthBars(values: List<Pair<String, Double>>) {
+    val max = (values.maxOfOrNull { it.second } ?: 0.0).coerceAtLeast(1.0)
+    val grow = remember { androidx.compose.animation.core.Animatable(if (ThemeState.reduceMotion) 1f else 0f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { if (!ThemeState.reduceMotion) grow.animateTo(1f, androidx.compose.animation.core.tween(800, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
+    Row(Modifier.fillMaxWidth().height(120.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Bottom) {
+        values.forEachIndexed { i, (label, v) ->
+            val on = i == values.lastIndex
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                val h = (92f * (v / max).toFloat() * grow.value).coerceAtLeast(4f)
+                Box(Modifier.fillMaxWidth().height(h.dp).clip(RoundedCornerShape(8.dp)).background(if (on) Glass.Yellow else Glass.TileBg))
+                IT(label, 12.sp, if (on) Glass.Ink else Glass.Muted, if (on) FontWeight.SemiBold else FontWeight.Medium)
             }
         }
     }
@@ -332,47 +329,80 @@ fun SettingsScreen(state: AppState) {
     }
     fun open(url: String) = runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
 
-    LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        item {
-          AccentHeader("Settings", "Make it work your way", actions = { HeaderButton(R.drawable.lc_circle_help, "Help") { dialog = "help" } }) {
-            HeaderCard(onClick = { dialog = "account" }) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                    Box(
-                        Modifier.size(52.dp).clip(CircleShape).background(Glass.Charcoal),
-                        contentAlignment = Alignment.Center,
-                    ) { T(initials(settings.user.ifBlank { user?.email ?: "" }), 19.sp, Glass.OnPrimary, FontWeight.Bold) }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        T(nice(settings.user).ifBlank { "Your account" }, 18.sp, Glass.Ink, FontWeight.Bold)
-                        T(user?.email ?: "", 11.sp, Glass.Muted)
-                        T("Manage account", 11.sp, Glass.Ink, FontWeight.SemiBold)
+    IosPage(Scene.Settings) {
+        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            item {
+                Column(Modifier.statusBarsPadding().padding(top = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GlassCircle(R.drawable.lc_chevron_left, "Back") { state.pop() }
+                        Spacer(Modifier.weight(1f))
+                        GlassCircle(R.drawable.lc_circle_help, "Help") { dialog = "help" }
                     }
-                    Lc(R.drawable.lc_chevron_right, Glass.Muted, 18.dp)
+                    IT("Settings", 34.sp, Glass.Ink, FontWeight.Bold, Modifier.padding(top = 12.dp, start = 4.dp))
                 }
             }
-          }
-        }
-        item {
-            GlassCard(padding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
-                SettingRow(R.drawable.lc_building_2, "Business details",
-                    listOf(nice(settings.company), nice(settings.user), settings.currency.ifBlank { "AED" }).filter { it.isNotBlank() }.joinToString(" · "), true) { dialog = "business" }
-                SettingRow(R.drawable.lc_palette, "Theme", ThemeState.palette.name, true) { dialog = "theme" }
-                SettingRow(R.drawable.lc_file_down, "Export to Excel", "Sales & cash paid", true) { exportCsv(ctx, bookings, cash, lists) }
-                SettingRow(R.drawable.lc_cloud_check, "Backup & restore", "${bookings.size} sales · ${cash.size} payments", false) { dialog = "backup" }
-            }
-        }
-        item {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (syncLine.isNotEmpty()) Row(
-                    Modifier.clip(RoundedCornerShape(100.dp)).background(Glass.Card).padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+            item {
+                Row(
+                    Modifier.fillMaxWidth().enter(0).iosCard().clickable { dialog = "account" }.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Lc(if (sync == SyncState.Synced) R.drawable.lc_circle_check else if (sync == SyncState.Offline) R.drawable.lc_cloud_off else R.drawable.lc_refresh_cw, syncColor, 14.dp)
-                    T(syncLine, 11.sp, syncColor)
+                    Box(Modifier.size(56.dp).clip(CircleShape).background(Glass.Yellow), contentAlignment = Alignment.Center) {
+                        IT(initials(settings.user.ifBlank { user?.email ?: "" }), 20.sp, Glass.OnAccent, FontWeight.SemiBold)
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        IT(nice(settings.user).ifBlank { "Your account" }, 20.sp, Glass.Ink, FontWeight.SemiBold)
+                        IT(listOf(nice(settings.company), settings.currency.ifBlank { "AED" }).filter { it.isNotBlank() }.joinToString(" · "), 14.sp, Glass.Muted)
+                        if (syncLine.isNotEmpty()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Lc(if (sync == SyncState.Synced) R.drawable.lc_cloud_check else if (sync == SyncState.Offline) R.drawable.lc_cloud_off else R.drawable.lc_refresh_cw, syncColor, 13.dp)
+                            IT(syncLine, 12.sp, syncColor, FontWeight.SemiBold)
+                        }
+                    }
+                    Lc(R.drawable.lc_chevron_right, Glass.Muted, 14.dp)
                 }
-                T("Version ${BuildConfig.VERSION_NAME}", 12.sp, Glass.OnBgMuted, align = TextAlign.Center)
             }
+            item { Eyebrow("Appearance", modifier = Modifier.padding(start = 16.dp)) }
+            item {
+                Row(Modifier.enter(1), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Palettes.forEach { pal ->
+                        val on = ThemeState.palette.id == pal.id
+                        Column(
+                            Modifier.weight(1f).iosCard(22.dp).clickable { ThemeState.set(ctx, pal) }.padding(vertical = 14.dp)
+                                .semantics { selected = on },
+                            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            // little phone preview: page colour, header tint, white rows
+                            Column(
+                                Modifier.size(width = 44.dp, height = 70.dp).clip(RoundedCornerShape(10.dp)).background(pal.bg.first())
+                                    .border(1.dp, pal.divider, RoundedCornerShape(10.dp)),
+                            ) {
+                                Box(Modifier.fillMaxWidth().height(22.dp).background(pal.accent))
+                                repeat(3) { Box(Modifier.padding(start = 6.dp, top = 5.dp).size(width = 32.dp, height = 7.dp).clip(RoundedCornerShape(3.dp)).background(Color.White)) }
+                            }
+                            IT(pal.name, 13.sp, Glass.Ink, if (on) FontWeight.SemiBold else FontWeight.Medium)
+                            Box(
+                                Modifier.size(20.dp).clip(CircleShape).background(if (on) pal.accent else Color.Transparent)
+                                    .then(if (on) Modifier else Modifier.border(1.5.dp, Glass.Divider, CircleShape)),
+                                contentAlignment = Alignment.Center,
+                            ) { if (on) Lc(R.drawable.lc_check, pal.onAccent, 12.dp) }
+                        }
+                    }
+                }
+            }
+            item { Eyebrow("Your data", modifier = Modifier.padding(start = 16.dp)) }
+            item {
+                InsetGroup(Modifier.enter(2)) {
+                    IosRow(R.drawable.lc_building_2, "Business details",
+                        listOf(nice(settings.company), nice(settings.user), settings.currency.ifBlank { "AED" }).filter { it.isNotBlank() }.joinToString(" · ")) { dialog = "business" }
+                    IosRow(R.drawable.lc_cloud_check, "Backup file", "${bookings.size} sales · ${cash.size} payments", last = true) { dialog = "backup" }
+                }
+            }
+            item {
+                Box(Modifier.fillMaxWidth().iosCard().clickable { dialog = "signout" }.padding(vertical = 15.dp), contentAlignment = Alignment.Center) {
+                    IT("Sign Out", 17.sp, Glass.Due)
+                }
+            }
+            item { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { IT("Version ${BuildConfig.VERSION_NAME}", 13.sp, Glass.Muted) } }
         }
-        item { TabBarSpacer() }
     }
 
     when (dialog) {

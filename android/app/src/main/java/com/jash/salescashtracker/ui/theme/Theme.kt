@@ -23,17 +23,17 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.jash.salescashtracker.R
 
-/** Outfit, the typeface used in the theme mockups. */
-val Outfit = FontFamily(
-    Font(R.font.outfit_regular, FontWeight.Normal),
-    Font(R.font.outfit_medium, FontWeight.Medium),
-    Font(R.font.outfit_semibold, FontWeight.SemiBold),
-    Font(R.font.outfit_bold, FontWeight.Bold),
-    Font(R.font.outfit_extrabold, FontWeight.ExtraBold),
+/** Inter: the closest open font to Apple's SF Pro, used for the iOS-style redesign. */
+val Inter = FontFamily(
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_medium, FontWeight.Medium),
+    Font(R.font.inter_semibold, FontWeight.SemiBold),
+    Font(R.font.inter_bold, FontWeight.Bold),
+    Font(R.font.inter_display_bold, FontWeight.ExtraBold),
 )
 
-/** Older name kept so every screen picks up the new typeface. */
-val Inter = Outfit
+/** Older name kept so older references compile. */
+val Outfit = Inter
 
 // Older palette names still referenced by shared form components; they follow the active theme.
 object AppColors {
