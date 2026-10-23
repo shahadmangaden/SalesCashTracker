@@ -1,0 +1,95 @@
+name: Deploy agentroute.app (Cloudflare)
+
+# agentroute.app       -> AgentRoute landing / download page   (sites/agentroute)
+# cash.agentroute.app  -> Sales Cash Tracker web app           (sites/cash -> web-dist)
+#
+# Secrets (Settings -> Secrets and variables -> Actions):
+#   CLOUDFLARE_API_TOKEN   "Edit Cloudflare Workers" API token   (required)
+#   CLOUDFLARE_ACCOUNT_ID  Cloudflare account ID                 (required)
+#   AGENTROUTE_REPO_TOKEN  read-only GitHub token for the AgentRoute repo, so the
+#                          page always serves the newest AgentRoute APK (optional)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['android/**', '.github/workflows/build-android.yml']
+  schedule:
+    - cron: '17 3 * * *'   # daily, picks up a new AgentRoute release
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      AR_TOKEN: ${{ secrets.AGENTROUTE_REPO_TOKEN }}
+      AR_REPO: shahadmangaden/CompassPro
+    steps:
+      - name: Check Cloudflare secrets
+        run: |
+          if [ -z "$CF_TOKEN" ] || [ -z "$CF_ACCOUNT" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set yet - skipping deploy."
+          fi
+
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build Sales Cash Tracker web app
+        run: npm run build:web
+        env:
+          APP_VERSION: 1.0.${{ github.run_number }}
+
+      - name: Fetch newest AgentRoute APK
+        env:
+          GH_TOKEN: ${{ secrets.AGENTROUTE_REPO_TOKEN }}
+        run: |
+          page=sites/agentroute/public
+          if [ -n "$AR_TOKEN" ]; then
+            # newest AgentRoute release (tags start with salestrack-), release APK only (not -debug)
+            read -r tag name size < <(gh api "repos/$AR_REPO/releases?per_page=30" --jq '
+              [ .[] | select(.tag_name | startswith("salestrack-")) | select(.draft | not) ][0]
+              | .tag_name as $t
+              | [ .assets[] | select(.name | test("^AgentRoute-v[0-9.]+\\.apk$")) ][0]
+              | "\($t) \(.name) \(.size)"')
+            if [ -n "$name" ] && [ "$name" != "null" ]; then
+              gh release download "$tag" --repo "$AR_REPO" --pattern "$name" --output "$page/AgentRoute.apk"
+              version=$(echo "$name" | sed -E 's/^AgentRoute-v([0-9.]+)\.apk$/\1/')
+              mb=$(awk -v b="$size" 'BEGIN{printf "%.1f MB", b/1048576}')
+              echo "Serving $name from $tag ($mb)"
+            fi
+          fi
+          if [ -f "$page/AgentRoute.apk" ]; then
+            sed -i "s/{{VERSION}}/$version/g; s/{{SIZE}}/$mb/g" "$page/index.html"
+          else
+            echo "::warning::No AgentRoute APK available - download buttons point to the install section."
+            sed -i 's#href="/AgentRoute.apk" download#href="\#install"#g; s/Version {{VERSION}} · {{SIZE}} · /Download link coming soon · /; s/Version {{VERSION}} · Free/Coming soon/' "$page/index.html"
+          fi
+
+      - name: Deploy agentroute.app
+        if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: sites/agentroute
+          command: deploy
+
+      - name: Deploy cash.agentroute.app
+        if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: sites/cash
+          command: deploy

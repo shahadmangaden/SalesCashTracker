@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1F2228"/><stop offset="1" stop-color="#111316"/></linearGradient>
+    <linearGradient id="pin" x1="0" y1="190" x2="0" y2="640" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFE066"/><stop offset="1" stop-color="#F5B800"/></linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#bg)"/>
+  <g transform="translate(512 512) scale(0.86) translate(-522 -518)">
+    <g fill="#F4EEDF">
+      <circle cx="310" cy="770" r="17"/><circle cx="353" cy="722" r="17"/><circle cx="392" cy="671" r="17"/>
+      <circle cx="460" cy="640" r="30"/><circle cx="510" cy="640" r="17"/><circle cx="574" cy="637" r="17"/><circle cx="630" cy="607" r="17"/>
+      <path fill-rule="evenodd" d="M208,790a42,42 0 1,0 84,0a42,42 0 1,0 -84,0M232,790a18,18 0 1,0 36,0a18,18 0 1,0 -36,0"/>
+    </g>
+    <path fill="url(#pin)" fill-rule="evenodd" d="M690,640C635,560 535,460 535,345A155,155 0 1,1 845,345C845,460 745,560 690,640ZM628,345a62,62 0 1,0 124,0a62,62 0 1,0 -124,0"/>
+    <circle cx="690" cy="345" r="22" fill="#FFE066"/>
+  </g>
+</svg>

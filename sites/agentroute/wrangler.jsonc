@@ -1,0 +1,14 @@
+{
+  // agentroute.app — AgentRoute landing / download page (static assets only)
+  "name": "agentroute-site",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "html_handling": "drop-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "agentroute.app", "custom_domain": true },
+    { "pattern": "www.agentroute.app", "custom_domain": true }
+  ]
+}

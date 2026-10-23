@@ -1,0 +1,12 @@
+{
+  // cash.agentroute.app — Sales Cash Tracker web app (the web-dist build)
+  "name": "sales-cash-tracker-web",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "../../web-dist",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    { "pattern": "cash.agentroute.app", "custom_domain": true }
+  ]
+}
